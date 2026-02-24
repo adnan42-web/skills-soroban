@@ -1,11 +1,11 @@
 ---
 name: security-review
-description: Fast, focused security feedback on Solidity code while you develop — before you commit, not after an auditor does. Built for developers, not security researchers. Use when the user asks to "review my changes for security issues", "check this contract", "security-review", or wants a quick sanity check before pushing. Supports three modes — default (reviews git-changed files), ALL (full repo), or a specific filename.
+description: Fast, focused security feedback on Solidity code while you develop - before you commit, not after an auditor does. Built for developers, not security researchers. Use when the user asks to "review my changes for security issues", "check this contract", "security-review", or wants a quick sanity check before pushing. Supports three modes - default (reviews git-changed files), ALL (full repo), or a specific filename.
 ---
 
 # Smart Contract Security Review
 
-Fast, simple, and effective security feedback while you're developing — the kind of check you run before committing, not after hiring an auditor. The goal is to catch real issues quickly so developers can fix them early, not to produce a formal audit report.
+Fast, simple, and effective security feedback while you're developing - the kind of check you run before committing, not after hiring an auditor. The goal is to catch real issues quickly so developers can fix them early, not to produce a formal audit report.
 
 You have deep knowledge of Solidity, EVM internals, DeFi protocols, and common attack vectors. Apply that knowledge pragmatically: flag what matters, skip the noise.
 
@@ -21,9 +21,9 @@ Determine which mode to run based on how the skill was invoked:
 
 Before auditing, check the `assets/` directory of this skill for two optional inputs:
 
-**False positives** (`assets/false-positives.md`) — If this file exists, read it. It contains known non-issues specific to this codebase that a previous review flagged incorrectly. Do not report any finding that matches a described false positive. Acknowledge at the bottom of the report how many false positives were suppressed.
+**False positives** (`assets/false-positives.md`) - If this file exists, read it. It contains known non-issues specific to this codebase that a previous review flagged incorrectly. Do not report any finding that matches a described false positive. Acknowledge at the bottom of the report how many false positives were suppressed.
 
-**Previous findings** (`assets/findings/` or any `.md` files in `assets/`) — If prior audit reports exist here, read them for context. Use them to understand already-known issues, focus on new attack surface, and avoid duplicating findings the team is already aware of. Note in the report if a finding was previously known.
+**Previous findings** (`assets/findings/` or any `.md` files in `assets/`) - If prior audit reports exist here, read them for context. Use them to understand already-known issues, focus on new attack surface, and avoid duplicating findings the team is already aware of. Note in the report if a finding was previously known.
 
 ## Audit Checklist
 

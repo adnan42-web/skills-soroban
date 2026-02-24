@@ -2,12 +2,12 @@
 
 Fast, simple, stupid but effective security feedback while developing or before committing to version control.
 
-Built for **developers** who want to catch issues early — not a replacement for a formal audit, but the check you should run every time you touch a contract.
+Built for **developers** who want to catch issues early - not a replacement for a formal audit, but the check you should run every time you touch a contract.
 
 ## Usage
 
 ```bash
-# Review only what changed (default — fastest)
+# Review only what changed (default - fastest)
 /security-review
 
 # Review a specific file
@@ -31,7 +31,7 @@ Create `assets/false-positives.md` and describe any known non-issues. The review
 
 ## Carrying over previous findings
 
-Drop prior audit report `.md` files into `assets/findings/`. The reviewer will use them as context — avoiding duplicate findings and focusing on new attack surface.
+Drop prior audit report `.md` files into `assets/findings/`. The reviewer will use them as context - avoiding duplicate findings and focusing on new attack surface.
 
 ## Who this is for
 

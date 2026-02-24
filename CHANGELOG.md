@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Given a version number `MAJOR.MINOR.PATCH`:
 
-- **MAJOR** — breaking changes to skill interfaces or manifest schema
-- **MINOR** — new skills or backwards-compatible additions
-- **PATCH** — bug fixes, prompt improvements, documentation updates
+- **MAJOR** - breaking changes to skill interfaces or manifest schema
+- **MINOR** - new skills or backwards-compatible additions
+- **PATCH** - bug fixes, prompt improvements, documentation updates
 
 Pre-release versions are tagged as `v1.0.0-beta.1`, `v1.0.0-rc.1`, etc.
 

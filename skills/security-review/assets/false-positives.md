@@ -6,4 +6,4 @@ Each entry should describe the pattern or finding clearly enough for the auditor
 
 ## Example
 
-**Centralization risk in `Ownable.transferOwnership`** — Intentional design, owner is a multisig. Not a finding.
+**Centralization risk in `Ownable.transferOwnership`** - Intentional design, owner is a multisig. Not a finding.

@@ -22,11 +22,11 @@ By participating, you agree to our [Code of Conduct](CODE_OF_CONDUCT.md). Please
 
 ## Ways to Contribute
 
-- **New skill** — Add a skill for any supported AI platform.
-- **Improve an existing skill** — Fix bugs, improve prompts, add examples.
-- **Documentation** — Fix typos, clarify instructions, add translations.
-- **Bug report** — Open an issue using the bug report template.
-- **Feature request** — Suggest new skill ideas or repository improvements.
+- **New skill** - Add a skill for any supported AI platform.
+- **Improve an existing skill** - Fix bugs, improve prompts, add examples.
+- **Documentation** - Fix typos, clarify instructions, add translations.
+- **Bug report** - Open an issue using the bug report template.
+- **Feature request** - Suggest new skill ideas or repository improvements.
 
 ---
 
@@ -90,7 +90,7 @@ Every skill must include:
 
 **`platform`** must be one of: `claude`, `openai`, `gemini`, `generic`.
 
-**`model_compatibility`** — list the specific models this skill has been tested with.
+**`model_compatibility`** - list the specific models this skill has been tested with.
 
 ### 5. Platform-Specific Notes
 
@@ -116,11 +116,11 @@ Every skill must include:
 
 ## Skill Quality Standards
 
-- **Focused** — Each skill does one thing well.
-- **Tested** — Include at least one example showing input and expected output.
-- **Safe** — Skills must not encourage harmful, deceptive, or unethical behavior.
-- **Model-honest** — Clearly state which models the skill has been tested with.
-- **No hardcoded secrets** — Never include API keys, tokens, or personal data.
+- **Focused** - Each skill does one thing well.
+- **Tested** - Include at least one example showing input and expected output.
+- **Safe** - Skills must not encourage harmful, deceptive, or unethical behavior.
+- **Model-honest** - Clearly state which models the skill has been tested with.
+- **No hardcoded secrets** - Never include API keys, tokens, or personal data.
 
 ---
 

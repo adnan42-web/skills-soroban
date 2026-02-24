@@ -19,7 +19,7 @@ CLAUDE.md            # Imports AGENTS.md for Claude Code
 ## Rules
 
 - One skill, one purpose.
-- No fabricated examples — outputs must reflect real model responses.
+- No fabricated examples - outputs must reflect real model responses.
 - No secrets, API keys, or personal data.
 - Only list models in `model_compatibility` that have been tested.
 - Do not modify `skills/_template/`.
