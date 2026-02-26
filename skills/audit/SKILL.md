@@ -77,6 +77,47 @@ Before scanning, load if present:
 
 - **`assets/findings/`** — prior audit reports. Use as context to avoid duplicating known issues. Mark previously known findings as such.
 
+## Progress Logging
+
+Emit status lines as you work so the user can follow along in real time. Use this format — print each line before doing the corresponding work, not after.
+
+**Startup:**
+```
+🔐 Starting security review — <mode> mode · confidence ≥ <N> · <time>s budget
+📂 Files in scope: src/Vault.sol · src/Token.sol · src/Staking.sol
+```
+
+**For each file:**
+```
+🔍 Reading src/Vault.sol...
+```
+
+**Vector pass headers** (print once per pass, before scanning that severity across all files):
+```
+⛔ Scanning CRITICAL vectors...
+🔴 Scanning HIGH vectors...
+🟡 Scanning MEDIUM vectors...
+🔵 Scanning LOW vectors...
+```
+
+**When a finding is confirmed** (print inline, before moving on):
+```
+  ⚡ Found [CRITICAL] Reentrancy — Vault.withdraw() · confidence 94
+  ⚡ Found [HIGH] Missing access control — Vault.setFee() · confidence 88
+```
+
+**When a vector pass finds nothing:**
+```
+  ✅ No CRITICAL findings
+```
+
+**Wrap-up:**
+```
+📊 Building report...
+```
+
+Keep log lines terse. No full sentences — just the key fact.
+
 ## Review Process
 
 For each file in scope:
