@@ -13,6 +13,12 @@ references/attack-vectors.md
 ```
 It contains 49 attack vectors with precise detection patterns and false-positive signals. Use it as your scanning checklist for every file.
 
+Always read the report formatting specification before producing output:
+```
+references/report-formatting.md
+```
+It defines the disclaimer, severity classification, output format, and ordering rules. Follow it exactly.
+
 ## Mode Selection
 
 - **Default** (no arguments): run `git diff HEAD --name-only`, filter for `.sol` files. Stop and say so if there are no changed Solidity files.
@@ -99,30 +105,7 @@ Prioritize findings that are:
 
 ## Output Format
 
-```
-# Security Review
-
-## Summary
-<1-3 sentences: severity distribution, files reviewed, most critical finding>
-
-## Findings
-
-### [CRITICAL|HIGH|MEDIUM|LOW|INFO] Title
-- **Confidence:** N/100
-- **Location:** ContractName.functionName (line N)
-- **Vector:** <vector name from attack-vectors.md>
-- **Issue:** <what is wrong and why it matters>
-- **Impact:** <what an attacker can do>
-- **PoC:** <minimal attack scenario - one paragraph, no full exploit code> *(omitted in --fast mode: replaced by one sentence)*
-- **Fix:** <concrete code-level recommendation>
-
-## Scope
-<files reviewed, mode, confidence threshold in effect>
-False positives skipped: N (entry, ...)
-Below confidence threshold: N
-```
-
-Order findings Critical first. Omit severity levels that have no findings.
+Follow `references/report-formatting.md` exactly. Summary: disclaimer first, then a findings table (number, severity, title), then detailed findings sections in the same order, then Scope. Severity levels: CRITICAL, HIGH, MEDIUM, LOW only — do not report INFO findings.
 
 ## Constraints
 
@@ -130,3 +113,4 @@ Order findings Critical first. Omit severity levels that have no findings.
 - Do not report theoretical issues that are structurally prevented by the codebase (check false-positive signals).
 - Never fabricate findings to appear thorough.
 - Keep PoC concise - attack scenario, not a full working exploit.
+- Do not report INFO findings. Minimum severity is LOW.
