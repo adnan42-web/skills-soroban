@@ -19,6 +19,10 @@ Built for **developers** who want to catch issues early - not a replacement for 
 # Fast mode - CRITICAL/HIGH only, under 1 minute (combinable with any of the above)
 /security-scan --fast
 /security-scan --fast src/Vault.sol
+
+# Confidence threshold - only report findings at or above N/100 (default: 80)
+/security-scan --confidence=65    # broader sweep, includes more uncertain findings
+/security-scan --confidence=95    # tight report, near-certain issues only
 ```
 
 ## What it does
@@ -27,7 +31,7 @@ Built for **developers** who want to catch issues early - not a replacement for 
 - **File mode**: reviews a single contract you specify
 - **ALL mode**: scans the full repo at its current state
 
-It reads your code, applies a standard checklist of Solidity vulnerabilities, and gives you a structured report with severity, impact, and a concrete fix for each finding.
+It reads your code, applies a standard checklist of Solidity vulnerabilities, and gives you a structured report with severity, confidence score, impact, and a concrete fix for each finding. Findings below the confidence threshold are suppressed — the report stays signal, not noise.
 
 ## False positives
 

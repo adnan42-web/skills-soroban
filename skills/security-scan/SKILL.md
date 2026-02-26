@@ -25,7 +25,7 @@ It defines the disclaimer, severity classification, output format, and ordering 
 - **ALL**: scan all `.sol` files in the repo (exclude `lib/`, `out/`, `node_modules/`, `.git/`).
 - **`$filename`**: scan that specific file only.
 - **`--fast`** (optional flag, combinable with any mode): complete in under 1 minute. See Fast Mode below.
-- **`--confidence=N`** (optional, default `85`): minimum confidence score (0–100) a finding must reach to be reported. Lower values cast a wider net; higher values report only near-certain issues. Example: `--confidence=70` for a broad sweep, `--confidence=95` for a tight, high-signal report.
+- **`--confidence=N`** (optional, default `80`): minimum confidence score (0–100) a finding must reach to be reported. Lower values cast a wider net; higher values report only near-certain issues. Example: `--confidence=70` for a broad sweep, `--confidence=95` for a tight, high-signal report.
 
 ## Fast Mode
 
