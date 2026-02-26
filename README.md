@@ -68,21 +68,7 @@ For Cursor and Windsurf, copy the contents of `SKILL.md` directly into the rules
 
 ## Contributing
 
-We welcome new skills, improvements, and fixes. One skill, one purpose - see [AGENTS.md](AGENTS.md) for contribution rules. Contributions happen through pull requests.
-
----
-
-## Structure
-
-```
-skills/
-└── skill-name/
-    ├── SKILL.md         # Required - frontmatter + instructions
-    ├── README.md        # Usage and examples
-    ├── scripts/         # Executable helpers
-    ├── references/      # Docs loaded into context
-    └── assets/          # Templates and static files
-```
+We welcome new skills, improvements, and fixes. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide — skill structure, quality standards, and PR process. One skill, one purpose.
 
 Skills follow the [agentskills.io](https://agentskills.io/) open standard.
 

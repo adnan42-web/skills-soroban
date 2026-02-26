@@ -24,5 +24,4 @@ CLAUDE.md            # Imports AGENTS.md for Claude Code
 - No fabricated examples - outputs must reflect real model responses.
 - No secrets, API keys, or personal data.
 - Only list models in `model_compatibility` that have been tested.
-- Do not modify `skills/_template/`.
 - Do not update `marketplace.json` without also moving or renaming the skill directory.

@@ -15,19 +15,17 @@ We are committed to making participation in this project a welcoming, respectful
 ## Unacceptable Behavior
 
 - Personal attacks, insults, or derogatory comments.
-- Public or private intimidation or threatening behavior.
+- Intimidation or threatening behavior, public or private.
 - Sharing others' private information without consent.
-- Any conduct that would reasonably be considered inappropriate in a professional setting.
+- Any conduct that would be considered inappropriate in a professional setting.
 
 ## Enforcement
 
-Instances of unacceptable behavior may be reported to the maintainers at the email listed in the repository profile. All reports will be reviewed and investigated confidentially.
-
-Maintainers have the right to remove, edit, or reject contributions and to temporarily or permanently ban contributors who violate this code.
+Report violations to the maintainers via the contact on the [GitHub profile](https://github.com/pashov). All reports are reviewed and investigated confidentially. Maintainers may remove contributions or restrict access for violations of this code.
 
 ## Scope
 
-This Code of Conduct applies within all project spaces (issues, pull requests, discussions, code) and in public spaces when representing the project.
+This Code of Conduct applies within all project spaces — issues, pull requests, discussions, and code — and in public spaces when representing the project.
 
 ## Attribution
 

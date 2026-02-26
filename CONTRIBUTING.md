@@ -91,7 +91,7 @@ Human-readable documentation. Must include:
 
 Files the agent loads at runtime to inform its work. Examples:
 
-- `audit/references/attack-vectors.md` — 52 attack vectors with detect patterns and false-positive signals
+- `audit/references/attack-vectors.md` — 62 attack vectors with detect patterns and false-positive signals
 - `lint/references/rules.md` — detailed rules for each linting pass
 
 Reference files should be structured and precise — the agent reads them as a checklist or specification.
@@ -183,7 +183,7 @@ The most valuable contributions are targeted improvements to existing skills:
 - **One skill, one purpose.** A skill that does two unrelated things should be two skills.
 - **No fabricated examples.** Outputs in documentation must reflect real model responses, not idealized ones.
 - **No secrets or personal data.** No API keys, tokens, wallet addresses, internal hostnames, or anything sensitive.
-- **Agent-agnostic.** Skills must work across Claude Code, Codex, GitHub Copilot, Cursor, and Windsurf. Avoid Claude-specific syntax in the instruction body unless the skill explicitly targets a single agent.
+- **Agent-agnostic by default.** Skills must work across Claude Code, Codex, GitHub Copilot, Cursor, and Windsurf. Agent-specific sections (e.g., model selection, extended thinking) are allowed when clearly marked and documented.
 - **Honest about scope.** If a skill only works well for Foundry projects, say so clearly. Do not overstate capability.
 - **Constraints are mandatory.** Every skill instruction body must include explicit constraints — what the agent must not do, must not report, must not fabricate.
 
@@ -192,12 +192,9 @@ The most valuable contributions are targeted improvements to existing skills:
 ## Pull Request Process
 
 1. Ensure your branch is up to date with `main`.
-2. CI runs automatically on push — make sure it passes:
-   - `python scripts/validate_skills.py` — validates skill manifests
-   - `markdownlint` — lints all `.md` files
-3. Fill in the PR template completely. Include a real input/output example.
-4. A maintainer will review within 5 business days.
-5. Address feedback promptly. Once approved, a maintainer will merge.
+2. Fill in the PR template completely. Include a real input/output example.
+3. A maintainer will review within 5 business days.
+4. Address feedback promptly. Once approved, a maintainer will merge.
 
 ### PR checklist
 
@@ -206,7 +203,6 @@ The most valuable contributions are targeted improvements to existing skills:
 - [ ] Reference files (if any) contain only real, tested content — no fabricated outputs
 - [ ] No API keys, tokens, or sensitive data anywhere in the skill
 - [ ] Skill works with at least one agent listed in the repo's supported matrix
-- [ ] CI passes
 
 ---
 
