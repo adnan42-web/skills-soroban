@@ -10,7 +10,9 @@ A community library of agent-agnostic AI skills. Each skill is a focused, self-c
 
 ```
 skills/
-├── audit-prep/     # Smart contract security audit skill
+├── audit/           # Security review of Solidity changes while you develop
+├── audit-prep/      # Full audit prep for security researchers
+├── lint/            # Solidity linter (NatSpec, naming, best practices)
 marketplace.json     # Plugin marketplace manifest
 AGENTS.md            # This file (read by all agents)
 CLAUDE.md            # Imports AGENTS.md for Claude Code

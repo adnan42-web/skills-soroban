@@ -1,11 +1,10 @@
 # Pashov Audit Group Skills
 
-> Modular, agent-agnostic skills for Claude Code, Codex, Copilot, Cursor, Windsurf, and beyond. Built by Pashov Audit Group [www.pashov.com](https://www.pashov.com/)
+> Modular, agent-agnostic skills for web3 development and security research. Built by Pashov Audit Group [www.pashov.com](https://www.pashov.com/)
 
 [![Agent Skills](https://img.shields.io/badge/Agent_Skills-agentskills.io-5B8DEF)](https://agentskills.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![CI](https://github.com/pashov/skills/actions/workflows/ci.yml/badge.svg)](https://github.com/pashov/skills/actions/workflows/ci.yml)
 
 Drop a skill into your AI environment and it gains a focused, reusable capability - like a plugin, but for AI agents.
 
@@ -69,12 +68,7 @@ For Cursor and Windsurf, copy the contents of `SKILL.md` directly into the rules
 
 ## Contributing
 
-We welcome new skills, improvements, and fixes. One skill, one purpose - see [AGENTS.md](AGENTS.md) for contribution rules.
-
-1. Copy an existing skill as a starting point.
-2. Fill in `SKILL.md` - frontmatter `name` and `description` are required.
-3. Add a `README.md` with usage examples.
-4. Open a pull request.
+We welcome new skills, improvements, and fixes. One skill, one purpose - see [AGENTS.md](AGENTS.md) for contribution rules. Contributions happen through pull requests.
 
 ---
 
@@ -98,6 +92,4 @@ Skills follow the [agentskills.io](https://agentskills.io/) open standard.
 
 Report vulnerabilities via [Security Policy](SECURITY.md). This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). [MIT](LICENSE) © contributors.
 
-## Security Consulting
-
-Reach out for a Pashov Audit Group security audit on [Telegram @pashovkrum](https://t.me/pashovkrum)
+For a Pashov Audit Group security engagement, reach out on [Telegram @pashovkrum](https://t.me/pashovkrum).

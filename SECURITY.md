@@ -1,17 +1,10 @@
 # Security Policy
 
-## Supported Versions
-
-| Version | Supported |
-|---------|-----------|
-| latest (`main`) | Yes |
-| older branches | No |
-
 ## Reporting a Vulnerability
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-To report a security issue, please email the maintainers directly via the contact listed on the [GitHub profile](https://github.com/pashov). Include as much detail as possible:
+Email the maintainers directly via the contact on the [GitHub profile](https://github.com/pashov). Include:
 
 - Description of the vulnerability
 - Steps to reproduce
