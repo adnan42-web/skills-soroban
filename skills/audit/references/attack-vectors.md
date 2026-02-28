@@ -1,6 +1,6 @@
 # Attack Vectors Reference
 
-60 attack vectors. For each: detection pattern (what to look for in code) and false-positive signals (what makes it NOT a vulnerability even if the pattern matches).
+68 attack vectors. For each: detection pattern (what to look for in code) and false-positive signals (what makes it NOT a vulnerability even if the pattern matches).
 
 ---
 
@@ -303,3 +303,44 @@
 
 - **Detect:** Contract tracks token holdings in a state variable (`totalDeposited`, `_reserves`, `cachedBalance`) that is only updated through the protocol's own deposit/receive functions. The actual `token.balanceOf(address(this))` can exceed the cached value via direct `token.transfer(contractAddress, amount)` calls made outside the protocol's accounting flow. When protocol logic uses the cached variable — not `balanceOf` live — for share pricing, collateral ratios, or withdrawal limits, an attacker donates tokens directly to inflate actual holdings, then exploits the gap between cached and real state (inflated share price, under-collateralized accounting). Distinct from ERC4626 inflation (Vector 17): applies to any contract with split accounting, not just vaults.
 - **FP:** All accounting reads `token.balanceOf(address(this))` live — no cached balance variable used in financial math. Cached value is reconciled against `balanceOf` at the start of every state-changing function. Direct token transfers are explicitly considered in the accounting model (e.g., treated as protocol revenue, not phantom deposits).
+
+**61. Merkle Tree Second Preimage Attack**
+
+- **Detect:** `MerkleProof.verify(proof, root, leaf)` where the leaf is derived from variable-length or 32-byte user-supplied input without double-hashing or type-prefixing. An attacker can pass a 64-byte value (concatenation of two sibling hashes at an intermediate node) as if it were a leaf — the standard hash tree produces the same root, so verification passes with a shorter proof. Pattern: `leaf = keccak256(abi.encodePacked(account, amount))` without an outer hash or prefix; no length restriction enforced on leaf inputs.
+- **FP:** Leaves are double-hashed (`keccak256(keccak256(data))`). Leaf includes a type prefix or domain tag that intermediate nodes cannot satisfy. Input length enforced to be ≠ 64 bytes. OpenZeppelin MerkleProof ≥ v4.9.2 with `processProofCalldata` or sorted-pair variant used correctly.
+
+**62. Merkle Proof Reuse — Leaf Not Bound to Caller**
+
+- **Detect:** Merkle proof accepted without tying the leaf to `msg.sender`. Pattern: `require(MerkleProof.verify(proof, root, keccak256(abi.encodePacked(amount))))` or leaf contains only an address that is not checked against `msg.sender`. Anyone who observes the proof in the mempool can front-run and claim the same entitlement by submitting it from a different address.
+- **FP:** Leaf explicitly encodes the caller: `keccak256(abi.encodePacked(msg.sender, amount))`. Function validates that the leaf's embedded address equals `msg.sender` before acting. Proof is single-use and recorded as consumed after the first successful call.
+
+**63. Sensitive Data in `private` State Variable**
+
+- **Detect:** State variable marked `private` or `internal` stores a secret value — private key, seed, password, cryptographic secret, or hidden game answer. Pattern: `uint256 private secretKey;`, `bytes32 private _seed;`, `uint8 private answer;`. All Ethereum state is publicly readable via `eth_getStorageAt` regardless of visibility; the Solidity `private` keyword only prevents other contracts from reading the variable — it does not encrypt or hide it from off-chain observers.
+- **FP:** Variable contains non-secret data (a counter, a cached sum) where Solidity visibility is used correctly as a code-organisation tool. Secret is generated via commit-reveal so the on-chain value is a hash of the secret, not the secret itself. Value is a public immutable constant.
+
+**64. Diamond Proxy Cross-Facet Storage Collision**
+
+- **Detect:** EIP-2535 Diamond proxy where two or more facets declare storage variables without EIP-7201 namespaced storage structs — each facet using plain `uint256 foo` or `mapping(...)` declarations that Solidity places at sequential storage slots 0, 1, 2, …. Different facets independently start at slot 0, so both write to the same slot. Also flag: facet uses a library that writes to storage without EIP-7201 namespacing.
+- **FP:** All facets store state exclusively in a single `DiamondStorage` struct retrieved via `assembly { ds.slot := DIAMOND_STORAGE_POSITION }` using a namespaced position (EIP-7201 formula). No facet declares top-level state variables. OpenZeppelin's ERC-7201 `@custom:storage-location` pattern used correctly.
+
+**65. Nested Mapping Inside Struct Not Cleared on `delete`**
+
+- **Detect:** `delete myMapping[key]` or `delete myArray[i]` where the deleted item is a struct containing a `mapping` or a dynamic array. Solidity's `delete` zeroes primitive fields but does not recursively clear mappings — the nested mapping's entries persist in storage. If the same key is later reused (e.g., a re-deposited user, re-created proposal), old mapping values are unexpectedly visible. Pattern: struct with `mapping(address => uint256)` or `uint256[]` field; `delete` called on the struct without manually iterating and clearing the nested mapping.
+- **FP:** Nested mapping manually cleared before `delete` (iterate and zero every entry). Struct key is never reused after deletion. Codebase explicitly accounts for residual mapping values in subsequent reads (always initialises before use).
+
+**66. Small-Type Arithmetic Overflow Before Upcast**
+
+- **Detect:** Arithmetic expression operates on `uint8`, `uint16`, `uint32`, `int8`, or other sub-256-bit types before the result is assigned to a wider type. Pattern: `uint256 result = a * b` where `a` and `b` are `uint8` — multiplication executes in `uint8` and overflows silently (wraps mod 256) before widening. Also: ternary returning a small literal `(condition ? 1 : 0)` inferred as `uint8`; addition `uint16(x) + uint16(y)` assigned to `uint32`. Underflow possible for signed sub-types.
+- **FP:** Each operand is explicitly upcast before the operation: `uint256(a) * uint256(b)`. SafeCast used. Solidity 0.8+ overflow protection applies only within the type of the expression — if both operands are `uint8`, the check is still on `uint8` range, not `uint256`.
+
+**67. ERC-1363 onTransferReceived / onApprovalReceived Missing Token Address Check**
+
+- **Detect:** Contract implements `IERC1363Receiver.onTransferReceived(address,address,uint256,bytes)` or `IERC1363Spender.onApprovalReceived(address,uint256,bytes)` but does not verify that `msg.sender` is the expected ERC-1363 token address. Because these callbacks are `external` and callable by anyone, an attacker can call them directly with forged `from`, `amount`, or `data` arguments to simulate a token transfer or approval that never happened — crediting balances, unlocking gates, or triggering state changes without any real token movement.
+- **FP:** First line of the callback is `require(msg.sender == address(expectedToken), "wrong token")`. Expected token stored as an `immutable` set in the constructor. Only whitelisted token addresses are trusted.
+
+**68. Single-Step Ownership Transfer (Ownable Without Ownable2Step)**
+
+- **Detect:** Contract uses OpenZeppelin `Ownable` (or a custom equivalent) that transfers ownership in a single `transferOwnership(address)` call with no confirmation step. A typo or wrong address permanently transfers control — the new address instantly becomes owner with no way to reverse. Pattern: inherits `Ownable` but not `Ownable2Step`; `transferOwnership` is not overridden to require acceptance; critical protocol functions gated on `onlyOwner`.
+- **FP:** Contract inherits `Ownable2Step` — new owner must call `acceptOwnership()` to confirm. Multi-sig is the current owner (human error still possible but raises bar). `renounceOwnership` overridden to revert (prevents accidental lock). Contract is intentionally abandoned / ownership deliberately renounceable by design.
+
