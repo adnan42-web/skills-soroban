@@ -62,6 +62,18 @@ Do not game the score upward to make a report look thorough. When in doubt, scor
 
 Before dividing files into groups, run `wc -l <files>` on all in-scope files. Use line counts to balance the workload across agents and flag unusually large files that may need extra attention.
 
+Print the in-scope files table to the terminal, ordered by line count descending:
+
+```
+**In-scope files ({N} files, {total} lines):**
+
+| File | Lines |
+|---|---|
+| <largest file> | <lines> |
+| <next file> | <lines> |
+| ... | ... |
+```
+
 ## Context Loading
 
 Load if present before launching workers:
@@ -89,7 +101,21 @@ Split in-scope files into up to 5 even groups. If fewer than 5 files, some agent
 
 ### Step 2 — Launch all 5 agents simultaneously
 
-Use the Agent tool to launch all active workers **in a single parallel call** (not sequentially). Each agent is `general-purpose`. Pass each a self-contained prompt using this template:
+Use the Agent tool to launch all active workers **in a single parallel call** (not sequentially). Each agent is `general-purpose`.
+
+After launching, print the agent assignment table to the terminal:
+
+```
+**Launching {N} parallel security agents...**
+
+| Agent | Focus | Files |
+|---|---|---|
+| 1 | <description of focus> | <lines or "All files"> |
+| 2 | <description of focus> | <lines or "All files"> |
+| ... | ... | ... |
+```
+
+Pass each a self-contained prompt using this template:
 
 ```
 You are an adversarial Solidity security researcher. Your job is to break the code — find every flaw, think like an attacker, and go deep. Assume nothing is safe until proven otherwise. Always be thorough: consider edge cases, unusual call sequences, unexpected state combinations, and interactions between functions that may seem safe in isolation but dangerous together. Scan the assigned files and return a structured findings list.
@@ -176,6 +202,19 @@ Get the current timestamp with `date +%Y%m%d-%H%M%S`. Derive the project name fr
 Report saved → assets/findings/{project-name}-pashov-ai-audit-report-{timestamp}.md
 {N} findings  ({critical} critical · {high} high · {medium} medium · {low} low)
 ```
+
+Then print a summary table of all findings to the terminal:
+
+```
+| # | Sev | Title |
+|---|-----|-------|
+| 1 | ⛔ CRITICAL | <title> |
+| 2 | 🔴 HIGH | <title> |
+| 3 | 🟡 MEDIUM | <title> |
+| 4 | 🔵 LOW | <title> |
+```
+
+Order: Critical first, then High, Medium, Low. Include every finding above the confidence threshold. This table is always printed — it is the primary terminal output the user sees.
 
 ## Banner
 
