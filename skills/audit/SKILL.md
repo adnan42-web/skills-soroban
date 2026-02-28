@@ -37,6 +37,8 @@ Print `⏱ [HH:MM:SS]` timestamps (via `date +%H:%M:%S`) at each of these checkp
 | `T4.N` | After every 3 findings drafted (see report-formatting.md) |
 | `T5 Report` | After report file written |
 
+After the report, print a **Timing** summary table showing each checkpoint's timestamp and the duration (mm:ss) from the previous checkpoint. This helps identify bottlenecks and optimise execution time.
+
 Read `references/report-formatting.md`, all applicable `attack-vectors.md` files, and all in-scope `.sol` files in a single parallel batch.
 
 For each file:
