@@ -66,7 +66,7 @@ Before dividing files into groups, run `wc -l <files>` on all in-scope files. Us
 
 Load if present before launching workers:
 
-- **`assets/findings/`** — prior audit reports. Pass to workers so they avoid duplicating known issues.
+- **`assets/findings/`** — prior audit reports and reports from previous `/audit` runs. Read every file. Pass to workers with two instructions: (1) for each previously reported finding, re-verify whether the vulnerability still exists in the current code — if still present, include it as a FINDING with a note that it was previously reported; if fixed, return it as a FIXED block; (2) do not duplicate issues that are already fully resolved.
 - **`assets/docs/`** — developer-supplied specs, design docs, invariants, or intended behavior. Load every file; pass URLs (one per line starting with `http://`) to workers to fetch. Use to distinguish bugs from design decisions, identify invariants, and calibrate confidence.
 
 ## Severity Assignment
@@ -105,7 +105,7 @@ You are an adversarial Solidity security researcher. Your job is to break the co
 [If ERC1155]: [absolute path to references/erc1155/attack-vectors.md]
 [If ERC4626]: [absolute path to references/erc4626/attack-vectors.md]
 [If ERC4337]: [absolute path to references/erc4337/attack-vectors.md]
-[If assets/findings/ has files]: Read all files in [absolute path] — avoid duplicating known issues.
+[If assets/findings/ has files]: Read all files in [absolute path]. For each previously reported finding: (1) locate the relevant code in your assigned files; (2) if the vulnerability still exists, include it as a FINDING with "Previously reported — still present" at the start of the Description; (3) if it has been fixed, return a FIXED block instead. Do not re-report fully resolved issues as new findings.
 [If assets/docs/ has files]: Read all files in [absolute path] — use to understand intended behavior.
 
 ## Severity tiers to prioritize
@@ -151,12 +151,18 @@ Location: ContractName.functionName
 Description: one sentence — what the issue is and why it was suppressed
 END_SUPPRESSED
 
-Return ONLY findings and suppressed entries. Do not write a report — the orchestrator handles that.
+FIXED
+Location: ContractName.functionName · line N
+Title: title from the previous report
+Description: one sentence confirming what changed in the code and how you verified the fix is effective
+END_FIXED
+
+Return ONLY findings, suppressed entries, and fixed entries. Do not write a report — the orchestrator handles that.
 ```
 
 ### Step 3 — Collect and merge
 
-Wait for all agents. Collect every `FINDING` and `SUPPRESSED` block into one combined list.
+Wait for all agents. Collect every `FINDING`, `SUPPRESSED`, and `FIXED` block into one combined list.
 
 ### Step 4 — Deduplicate
 
@@ -167,6 +173,25 @@ For each pair of findings, score similarity (0–100) based on root cause and af
 - **< 60** — independent; no action.
 
 Remove any finding fully subsumed by another. The goal is a clean, non-redundant report.
+
+### Step 5 — Write report to file
+
+Get the current timestamp with `date +%Y%m%d-%H%M%S`. Create the directory `assets/findings/` if it does not exist. Write the full report to `assets/findings/report-{timestamp}.md`. Do not print the report to the terminal — instead print only:
+
+```
+Report saved → assets/findings/report-{timestamp}.md
+{N} findings  ({critical} critical · {high} high · {medium} medium · {low} low)
+```
+
+If there were any `FIXED` blocks from workers, append a section to the report file:
+
+```markdown
+## Fixed Since Last Report
+
+| Location | Title |
+|---|---|
+| `Contract.function` | Title from previous report |
+```
 
 ## Banner
 
