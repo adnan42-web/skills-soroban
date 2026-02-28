@@ -44,7 +44,7 @@ Do not report INFO findings.
 
 ## Summary
 
-<1–2 sentences summarizing the overall security posture: number and severity of findings, the most critical risk areas identified, and the general quality of the codebase. Close with a recommendation that the development team address the reported findings and consider a formal security review before deployment.>
+<1–2 sentences summarizing the overall security posture: number and severity of findings, the most critical risk areas identified, and the general quality of the codebase. Close with a recommendation that the development team address the reported findings and consider a formal full security review before deployment.>
 
 ---
 

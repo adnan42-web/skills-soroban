@@ -35,7 +35,7 @@ In every mode, exclude before scanning:
 
 **Flag:**
 
-- **`--confidence=N`** (default `80`): minimum confidence score (0–100) a finding must reach to be reported.
+- **`--confidence=N`** (default `75`): minimum confidence score (0–100) a finding must reach to be reported. Lower values cast a wider net — more findings but more false positives. Higher values produce a tighter report with only near-certain issues.
 
 ## Confidence Scoring
 
@@ -46,7 +46,7 @@ Every finding is assigned a confidence score from 0 to 100. Findings below the a
 | 90–100   | Detection pattern matches exactly. No FP signals apply. Clear, step-by-step attack path. Function is public/external and reachable without preconditions. Meaningful value at risk. |
 | 75–89    | Pattern matches clearly but a FP signal partially applies (e.g., CEI partially followed, guard present but incomplete). Attack requires some preconditions or specific state.       |
 | 50–74    | Pattern matches but multiple FP signals reduce certainty. Requires elevated preconditions (specific role, multi-step setup, or low-probability state). Impact is limited.           |
-| Below 50 | Theoretical match only. Should rarely be reached — the FP filter should have eliminated these.                                                                                     |
+| Below 50 | Theoretical match only. Should rarely be reached — the FP filter should have eliminated these.                                                                                      |
 
 Scoring process:
 
@@ -117,7 +117,7 @@ After launching, print the agent assignment table to the terminal:
 
 Pass each a self-contained prompt using this template:
 
-```
+````
 You are an adversarial Solidity security researcher. Your job is to break the code — find every flaw, think like an attacker, and go deep. Assume nothing is safe until proven otherwise. Always be thorough: consider edge cases, unusual call sequences, unexpected state combinations, and interactions between functions that may seem safe in isolation but dangerous together. Scan the assigned files and return a structured findings list.
 
 **File access:** Use the Read tool to access every file listed below. If a Read call is denied, request permission from the user explicitly — never skip a file, and never ask the orchestrator to read it for you. You must read all files yourself.
@@ -167,7 +167,8 @@ Fix:
 ```diff
 - vulnerable line(s)
 + fixed line(s)
-```
+````
+
 Verification: re-trace the attack path with the fix applied and confirm in one sentence that the vulnerability is resolved
 END_FINDING
 
@@ -178,6 +179,7 @@ Description: one sentence — what the issue is and why it was suppressed
 END_SUPPRESSED
 
 Return ONLY findings and suppressed entries. Do not write a report — the orchestrator handles that.
+
 ```
 
 ### Step 3 — Collect and merge
@@ -199,19 +201,23 @@ Remove any finding fully subsumed by another. The goal is a clean, non-redundant
 Get the current timestamp with `date +%Y%m%d-%H%M%S`. Derive the project name from the basename of the repository root directory (e.g. if the path is `/home/user/my-project`, the project name is `my-project`). Create the directory `assets/findings/` if it does not exist. Write the full report to `assets/findings/{project-name}-pashov-ai-audit-report-{timestamp}.md`. Do not print the report to the terminal — instead print only:
 
 ```
+
 Report saved → assets/findings/{project-name}-pashov-ai-audit-report-{timestamp}.md
-{N} findings  ({critical} critical · {high} high · {medium} medium · {low} low)
+{N} findings ({critical} critical · {high} high · {medium} medium · {low} low)
+
 ```
 
 Then print a summary table of all findings to the terminal:
 
 ```
-| # | Sev | Title |
-|---|-----|-------|
-| 1 | ⛔ CRITICAL | <title> |
-| 2 | 🔴 HIGH | <title> |
-| 3 | 🟡 MEDIUM | <title> |
-| 4 | 🔵 LOW | <title> |
+
+| #   | Sev         | Title   |
+| --- | ----------- | ------- |
+| 1   | ⛔ CRITICAL | <title> |
+| 2   | 🔴 HIGH     | <title> |
+| 3   | 🟡 MEDIUM   | <title> |
+| 4   | 🔵 LOW      | <title> |
+
 ```
 
 Order: Critical first, then High, Medium, Low. Include every finding above the confidence threshold. This table is always printed — it is the primary terminal output the user sees.
@@ -221,12 +227,14 @@ Order: Critical first, then High, Medium, Low. Include every finding above the c
 Before doing anything else, print this exactly:
 
 ```
-██████╗  █████╗ ███████╗██╗  ██╗ ██████╗ ██╗   ██╗     ███████╗██╗  ██╗██╗██╗     ██╗     ███████╗
-██╔══██╗██╔══██╗██╔════╝██║  ██║██╔═══██╗██║   ██║     ██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝
-██████╔╝███████║███████╗███████║██║   ██║██║   ██║     ███████╗█████╔╝ ██║██║     ██║     ███████╗
-██╔═══╝ ██╔══██║╚════██║██╔══██║██║   ██║╚██╗ ██╔╝     ╚════██║██╔═██╗ ██║██║     ██║     ╚════██║
-██║     ██║  ██║███████║██║  ██║╚██████╔╝ ╚████╔╝      ███████║██║  ██╗██║███████╗███████╗███████║
-╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝   ╚═══╝       ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝
+
+██████╗ █████╗ ███████╗██╗ ██╗ ██████╗ ██╗ ██╗ ███████╗██╗ ██╗██╗██╗ ██╗ ███████╗
+██╔══██╗██╔══██╗██╔════╝██║ ██║██╔═══██╗██║ ██║ ██╔════╝██║ ██╔╝██║██║ ██║ ██╔════╝
+██████╔╝███████║███████╗███████║██║ ██║██║ ██║ ███████╗█████╔╝ ██║██║ ██║ ███████╗
+██╔═══╝ ██╔══██║╚════██║██╔══██║██║ ██║╚██╗ ██╔╝ ╚════██║██╔═██╗ ██║██║ ██║ ╚════██║
+██║ ██║ ██║███████║██║ ██║╚██████╔╝ ╚████╔╝ ███████║██║ ██╗██║███████╗███████╗███████║
+╚═╝ ╚═╝ ╚═╝╚══════╝╚═╝ ╚═╝ ╚═════╝ ╚═══╝ ╚══════╝╚═╝ ╚═╝╚═╝╚══════╝╚══════╝╚══════╝
+
 ```
 
 </instructions>
@@ -237,3 +245,4 @@ Before doing anything else, print this exactly:
 - Never fabricate findings to appear thorough.
 
 </constraints>
+```
