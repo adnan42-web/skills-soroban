@@ -1,231 +1,236 @@
-# Attack Vectors Reference (1/3 — Vectors 1–44)
+# Attack Vectors Reference (1/3 — Vectors 1–45)
 
 133 total attack vectors. For each: detection pattern (what to look for in code) and false-positive signals (what makes it NOT a vulnerability even if the pattern matches).
 
 ---
 
-**1. Block Number as Timestamp Approximation**
+**1. Staking Reward Front-Run by New Depositor**
 
-- **Detect:** Time computed as `(block.number - startBlock) * 13` assuming fixed block times. Post-Merge Ethereum has variable block times; Polygon/Arbitrum/BSC have very different averages. Causes wrong interest accrual, vesting, or reward calculations.
-- **FP:** `block.timestamp` used instead of `block.number` for all time-sensitive calculations.
+- **Detect:** Reward checkpoint (`rewardPerTokenStored`, `lastUpdateTime`) is updated lazily — only when a user action triggers it — and the update happens AFTER the new stake is recorded in `_balances` or `totalSupply`. A new staker can join immediately before `notifyRewardAmount()` is called (or immediately before a large pending reward accrues), and the checkpoint then distributes the new rewards pro-rata over a supply that includes the attacker's stake. The attacker earns rewards for a period they were not staked. Pattern: `_balances[user] += amount; totalSupply += amount;` executed before `updateReward()`.
+- **FP:** `updateReward(account)` is the very first step of `stake()` — executed before any balance update — so new stakers start from the current `rewardPerTokenStored` and earn nothing retroactively. `rewardPerTokenPaid[user]` correctly tracks per-user checkpoint.
 
-**2. Rebasing / Elastic Supply Token Accounting**
+**2. ERC1155 safeBatchTransferFrom with Unchecked Mismatched Array Lengths**
 
-- **Detect:** Contract holds rebasing tokens (stETH, AMPL, aTokens) and caches `token.balanceOf(this)` in a state variable used for future accounting. After a rebase, cached value diverges from actual balance.
-- **FP:** Protocol enforces at the code level that rebasing tokens cannot be deposited (explicit revert or whitelist). Accounting always reads `balanceOf` live. Wrapper tokens (wstETH) used instead.
+- **Detect:** Custom ERC1155 overrides `_safeBatchTransferFrom` or iterates `ids` and `amounts` arrays in a loop without first asserting `require(ids.length == amounts.length)`. A caller passes `ids = [1, 2, 3]` and `amounts = [100]` — the loop processes only as many iterations as the shorter array (Solidity reverts on OOB access in 0.8+, but a `for (uint i = 0; i < ids.length; i++)` loop that reads `amounts[i]` will revert mid-batch rather than rejecting cleanly). In assembly-optimized or unchecked implementations, the shorter array access silently reads uninitialized memory or produces wrong transfers.
+- **FP:** OZ ERC1155 base used without overriding batch transfer — OZ checks `ids.length == amounts.length` at the start and reverts with `ERC1155InvalidArrayLength`. Custom override explicitly asserts equal lengths as its first statement before any transfer logic.
 
-**3. Counterfactual Wallet Initialization Parameters Not Bound to Deployed Address**
+**3. DoS via Push Payment to Rejecting Contract**
 
-- **Detect:** Factory's `createAccount` uses `CREATE2` but the salt does not incorporate all initialization parameters (especially the owner address). An attacker can call `createAccount` with a different owner before the legitimate user, deploying a wallet they control to the same counterfactual address. Pattern: `salt` is a plain user-supplied value or only includes a partial subset of init data; `CREATE2` address can be predicted and front-run with different constructor args.
-- **FP:** Salt is derived from all initialization parameters: `salt = keccak256(abi.encodePacked(owner, ...))`. Factory reverts if the account already exists. Initializer is called atomically in the same transaction as deployment.
+- **Detect:** ETH/token distribution in a single loop using push model (`recipient.call{value:}("")`). If any recipient reverts on receive, the entire loop reverts. Also: `transfer()`/`send()` to contracts with expensive `fallback()`. (SWC-113)
+- **FP:** Pull-over-push pattern used — recipients withdraw their own funds. Loop uses `try/catch` and continues on failure.
 
-**4. Chainlink Feed Deprecation / Wrong Decimal Assumption**
+**4. tx.origin Authentication**
 
-- **Detect:** (a) Chainlink aggregator address is hardcoded in the constructor or an immutable with no admin path to update it. When Chainlink deprecates the feed and migrates to a new aggregator contract, the protocol continues reading from the frozen old feed, which may return a stale or zeroed price indefinitely. (b) Price normalization assumes `feed.decimals() == 8` (common for USD feeds) without calling `feed.decimals()` at runtime. Some feeds (e.g., ETH/ETH) return 18 decimals — the 10^10 scaling discrepancy produces wildly wrong collateral values, enabling instant over-borrowing or mass liquidations.
-- **FP:** Feed address is updatable via a governance-gated setter. `feed.decimals()` called and stored; used to normalize `latestRoundData().answer` before any arithmetic. Deviation check against a secondary oracle rejects anomalous values.
+- **Detect:** `require(tx.origin == owner)` or `require(tx.origin == authorized)` used for authentication. Vulnerable to phishing via malicious intermediary contract.
+- **FP:** `tx.origin == msg.sender` used only to assert caller is not a contract (anti-bot pattern, not auth).
 
-**5. Non-Atomic Multi-Contract Deployment (Partial System Bootstrap)**
+**5. Function Selector Clashing (Proxy Backdoor)**
 
-- **Detect:** Deployment script deploys multiple interdependent contracts across separate transactions without atomic guarantees. If the script fails midway (gas exhaustion, RPC error, nonce conflict, reverted transaction), the system is left in a half-deployed state: some contracts reference addresses that don't exist yet, or contracts are deployed but not wired together. A partially deployed lending protocol might have a vault deployed but no oracle configured, allowing deposits at a zero price. Pattern: Foundry script with multiple `vm.broadcast()` blocks or Hardhat deploy script with sequential `await deploy()` calls where later deployments depend on earlier ones. No idempotency checks (does the contract already exist?) or rollback mechanism. No deployment state file tracking which steps completed.
-- **FP:** Script uses a single `vm.startBroadcast()` / `vm.stopBroadcast()` block that batches all transactions atomically (note: Foundry still sends individual txs, but script halts on first failure). Deployment uses a factory contract that deploys and wires all contracts in a single transaction. Script is idempotent — checks for existing deployments before each step. Hardhat-deploy module with tagged, resumable migrations.
+- **Detect:** Proxy contract contains a function whose 4-byte selector collides with a function in the implementation. Two different function signatures can produce the same selector (e.g. `burn(uint256)` and `collate_propagate_storage(bytes16)` both = `0x42966c68`). When a user calls the implementation function, the proxy's function executes instead, silently running different logic. Pattern: proxy with any non-admin functions beyond `fallback()`/`receive()` -- check all selectors against implementation selectors for collisions.
+- **FP:** Transparent proxy pattern used -- admin calls always route to the proxy admin and user calls always delegate, making selector clashes between proxy and implementation impossible. UUPS proxy with no custom functions in the proxy shell -- all calls delegate unconditionally.
 
-**6. Precision Loss - Division Before Multiplication**
+**6. validateUserOp Signature Not Bound to nonce or chainId**
 
-- **Detect:** Expression `(a / b) * c` in integer math. Division truncates first, then multiplication amplifies the error. Common in fee calculations: `fee = (amount / 10000) * bps`. Correct form: `(a * c) / b`.
-- **FP:** `a` is provably divisible by `b` — enforced by a preceding explicit check (e.g., `require(a % b == 0)`) or by mathematical construction visible in the code.
+- **Detect:** `validateUserOp` reconstructs the signed digest manually (not via `entryPoint.getUserOpHash(userOp)`) and omits `userOp.nonce` or `block.chainid` from the signed payload. Enables cross-chain replay (same signature valid on other chains sharing the contract address) or in-chain replay after the wallet state is reset. Pattern: `keccak256(abi.encode(userOp.sender, userOp.callData, ...))` without nonce/chainId.
+- **FP:** Signed digest is computed via `entryPoint.getUserOpHash(userOp)` — EntryPoint includes sender, nonce, chainId, and entryPoint address. Custom digest explicitly includes `block.chainid` and `userOp.nonce`.
 
-**7. Flash Loan Governance Attack**
+**7. Proxy Storage Slot Collision**
 
-- **Detect:** Governance voting uses `token.balanceOf(msg.sender)` or `getPastVotes(account, block.number)` (current block). Attacker borrows governance tokens, votes, repays in one tx.
-- **FP:** Uses `getPastVotes(account, block.number - 1)` (prior block, un-manipulable in current tx). Timelock between snapshot and vote. Staking required before voting.
+- **Detect:** Proxy stores `implementation`/`admin` at sequential slots (0, 1) and implementation contract also declares variables from slot 0. Implementation's slot 0 write overwrites the proxy's `implementation` pointer.
+- **FP:** Proxy uses EIP-1967 slots (`keccak256("eip1967.proxy.implementation") - 1`). OpenZeppelin Transparent or UUPS proxy pattern used correctly.
 
-**8. Hardcoded Network-Specific Addresses**
+**8. ERC721Consecutive (EIP-2309) Balance Corruption with Single-Token Batch**
 
-- **Detect:** Deployment script or constructor contains hardcoded addresses for external dependencies (oracles, routers, tokens, registries) that differ across networks. When the script is reused on a different chain or testnet, these addresses point to wrong contracts, EOAs, or undeployed addresses — silently misconfiguring the system. A USDC address hardcoded for Ethereum mainnet resolves to an unrelated contract (or an EOA) on Arbitrum or Polygon. Pattern: literal `address(0x...)` constants in deployment scripts or constructor arguments that represent external protocol addresses. No per-chain configuration mapping or environment variable lookup.
-- **FP:** Addresses are loaded from a per-chain configuration file (JSON, TOML) keyed by chain ID. Script asserts `block.chainid` matches expected chain before using hardcoded addresses. Addresses are passed as constructor arguments from the deployment environment, not embedded in source. Deterministic addresses that are guaranteed identical across chains (e.g., CREATE2-deployed singletons like Permit2).
+- **Detect:** Contract uses OpenZeppelin's `ERC721Consecutive` extension (OZ < 4.8.2) and mints a batch of exactly one token via `_mintConsecutive(to, 1)`. A bug in that version fails to increment the recipient's balance for size-1 batches. `balanceOf(to)` returns 0 despite ownership being assigned. When the owner later calls `transferFrom`, the internal balance decrement underflows (reverts in checked math, or wraps in unchecked), leaving the token in a frozen state or causing downstream accounting errors in any contract that relies on `balanceOf` for reward distribution or collateral checks.
+- **FP:** OZ version ≥ 4.8.2 used (patched via GHSA-878m-3g6q-594q). Batch size is always ≥ 2. Contract uses standard `ERC721._mint` (non-consecutive) where every mint writes the balance mapping directly.
 
-**9. Unsafe Downcast / Integer Truncation**
+**9. ERC1155 Fungible / Non-Fungible Token ID Collision**
 
-- **Detect:** Explicit cast to smaller type without bounds check: `uint128(largeUint256)`. Solidity ≥0.8 silently truncates on downcast (does NOT revert). Especially dangerous in price feeds, share calculations, timestamps.
-- **FP:** Value validated against the target type's maximum before cast (e.g., `require(x <= type(uint128).max)`). OpenZeppelin `SafeCast` library used.
+- **Detect:** Protocol uses ERC1155 to represent both fungible tokens (specific IDs with `supply > 1`) and unique items (other IDs with intended `supply == 1`), relying only on convention rather than enforcement. No `require(totalSupply(id) == 0)` before minting an "NFT" ID, or no check that prevents minting additional copies of an ID already at supply 1. An attacker who can call the public mint function mints a second copy of an "NFT" ID, breaking uniqueness. Or role tokens (e.g., `ROLE_ID = 1`) are fungible and freely tradeable, undermining access control that is gated on `balanceOf(user, ROLE_ID) > 0`.
+- **FP:** Contract explicitly enforces `require(totalSupply(id) + amount <= maxSupply(id))` with `maxSupply` set to 1 for NFT IDs at creation time. Fungible and non-fungible ranges are disjoint and enforced with `require(id < FUNGIBLE_CUTOFF || id >= NFT_START)`. Role tokens are non-transferable (transfer overrides revert for role IDs).
 
-**10. NFT Staking / Escrow Records msg.sender Instead of ownerOf**
+**10. Storage Layout Collision Between Proxy and Implementation**
 
-- **Detect:** Staking or escrow contract accepts an ERC721 via `nft.transferFrom(msg.sender, address(this), tokenId)` and records `depositor[tokenId] = msg.sender`. An operator (approved but not the owner) can call `stake(tokenId)` — the transfer succeeds because the operator holds approval, but `msg.sender` is the operator, not the real owner. The real owner loses their NFT; the operator is credited as depositor and receives all staking rewards and the right to unstake. Pattern: `depositor[tokenId] = msg.sender` without cross-checking against `nft.ownerOf(tokenId)` before the transfer.
-- **FP:** Contract reads `address realOwner = nft.ownerOf(tokenId)` before accepting the transfer and records `depositor[tokenId] = realOwner`. Or requires `require(nft.ownerOf(tokenId) == msg.sender, "not owner")` so operators cannot stake on others' behalf.
+- **Detect:** Proxy contract declares state variables (e.g. `address admin`, `address implementation`) at standard sequential slots (0, 1, ...) instead of EIP-1967 randomized slots. Implementation also declares variables starting at slot 0. Proxy's admin address is non-zero so implementation reads it as `initialized = true` (or vice versa), enabling re-initialization or corrupting owner. Pattern: custom proxy with `address public admin` at slot 0; no EIP-1967 compliance. Real-world: Audius Governance (2022, ~$6M stolen -- `proxyAdmin` added to proxy storage, shadowing `initialized` flag).
+- **FP:** Proxy uses EIP-1967 slots (`keccak256("eip1967.proxy.implementation") - 1`). OpenZeppelin Transparent or UUPS proxy pattern used correctly. No state variables declared in the proxy contract itself.
 
-**11. Integer Overflow / Underflow**
+**11. Metamorphic Contract via CREATE2 + SELFDESTRUCT**
 
-- **Detect:** Arithmetic inside `unchecked {}` blocks (Solidity ≥0.8) that could over/underflow: subtraction without a prior `require(amount <= balance)`, multiplication of two large values. Any arithmetic in Solidity <0.8 without SafeMath. (SWC-101)
-- **FP:** Value range is provably bounded by earlier checks that appear in the same function before the unchecked block. `unchecked` used exclusively for loop counter increments of the form `++i` where `i < arr.length`, making overflow structurally impossible.
+- **Detect:** Contract deployed via `CREATE2` from a factory where the deployer can `selfdestruct` the contract and redeploy different bytecode to the same address. Governance voters verify code at proposal time, but the code can be swapped before execution. Pattern: `create2(0, ..., salt)` deployment + `selfdestruct` in the deployed contract or an intermediate deployer that resets its nonce. Real-world: Tornado Cash Governance (May 2023) -- attacker proposed legitimate contract, `selfdestruct`-ed it, redeployed malicious code at same address, gained 1.2M governance votes, drained ~$2.17M. Post-Dencun (EIP-6780): largely killed for pre-existing contracts, but same-transaction create-destroy-recreate may still work.
+- **FP:** Post-Dencun (EIP-6780): `selfdestruct` no longer destroys code unless same transaction as creation. `EXTCODEHASH` verified at execution time, not just proposal time. Contract was not deployed via `CREATE2` from a mutable deployer.
 
-**12. Single-Function Reentrancy**
+**12. Missing Nonce (Signature Replay)**
 
-- **Detect:** External call (`call{value:}`, `transfer`, `send`, `safeTransfer`, `safeTransferFrom`) happens _before_ state update (balance set to 0, flag set, counter decremented). Classic: check-external-effect instead of check-effect-external.
-- **FP:** State updated before the call (CEI followed). `nonReentrant` modifier present. Callee is a hardcoded immutable address of a contract whose receive/fallback is known to not re-enter.
+- **Detect:** Signed message has no per-user nonce, or nonce is present in the struct but never stored/incremented after use. Same valid signature can be submitted multiple times. (SWC-121)
+- **FP:** Monotonic per-signer nonce included in signed payload, stored, checked for reuse, incremented atomically. `usedSignatures[hash]` mapping invalidates after first use.
 
-**13. Immutable Variable Context Mismatch**
-
-- **Detect:** Implementation contract uses `immutable` variables set in its constructor. These are embedded in bytecode, not storage -- so when a proxy `delegatecall`s, it gets the implementation's hardcoded values regardless of per-proxy configuration needs. If the implementation is shared across multiple proxies or chains, all proxies see the same immutable values. Pattern: `address public immutable WETH` in implementation constructor -- every proxy gets the same WETH address regardless of chain.
-- **FP:** Immutable values are intentionally identical across all proxies (e.g. a protocol-wide constant). Per-proxy configuration uses storage variables set in `initialize()`. Implementation is purpose-deployed per proxy with correct constructor args.
-
-**14. CREATE2 Address Reuse After selfdestruct**
-
-- **Detect:** Protocol whitelists, approves, or trusts a contract at an address derived from CREATE2. Attacker controls the salt or factory. Pre-EIP-6780: attacker deploys a benign contract, earns trust (e.g., token approval, whitelist entry, governance power), calls `selfdestruct`, then redeploys a malicious contract to the identical address. The stored approval/whitelist entry now points to the malicious code. Pattern: `create2Factory.deploy(salt, initcode)` where `salt` is user-supplied or predictable, combined with no bytecode-hash verification at trust-grant time.
-- **FP:** Post-Dencun (EIP-6780): `selfdestruct` no longer destroys code unless it occurs in the same transaction as contract creation, effectively eliminating the redeploy path on mainnet. Bytecode hash of the approved contract recorded at approval time and re-verified before each privileged call. No user-controlled CREATE2 salt accepted by the factory.
-
-**15. ERC4626 Preview Rounding Direction Violation**
-
-- **Detect:** `previewDeposit(a)` returns more shares than `deposit(a)` actually mints; `previewRedeem(s)` returns more assets than `redeem(s)` actually transfers; `previewMint(s)` returns fewer assets than `mint(s)` actually charges; `previewWithdraw(a)` returns fewer shares than `withdraw(a)` actually burns. EIP-4626 mandates that preview functions round in the vault's favor — they must never overstate what the user receives or understate what the user pays. Custom `_convertToShares`/`_convertToAssets` implementations that apply the wrong `Math.mulDiv` rounding direction (e.g., `Rounding.Ceil` when `Rounding.Floor` is required) violate this. Integrators that use preview return values for slippage checks will pass with an incorrect expectation and receive less than they planned for.
-- **FP:** OpenZeppelin ERC4626 base used without overriding `_convertToShares`/`_convertToAssets`. Custom implementation explicitly passes `Math.Rounding.Floor` for share issuance (deposit/previewDeposit) and `Math.Rounding.Ceil` for share burning (withdraw/previewWithdraw).
-
-**16. abi.encodePacked Hash Collision with Dynamic Types**
-
-- **Detect:** `keccak256(abi.encodePacked(a, b, ...))` where two or more arguments are dynamic types (`string`, `bytes`, or dynamic arrays such as `uint[]`, `address[]`). `abi.encodePacked` concatenates raw bytes without length prefixes, so `("AB","CD")`, `("A","BCD")`, and `("ABC","D")` all produce the same byte sequence `0x41424344` and thus the same hash. If the hash is used for permit/signature verification, access control key derivation, or uniqueness enforcement (mapping keys, nullifiers), an attacker crafts an alternative input that collides with a legitimate hash and gains the same privileges.
-- **FP:** `abi.encode()` used instead — each argument is ABI-padded and length-prefixed, eliminating ambiguity. Only one argument is a dynamic type (no two dynamic types to collide between). All arguments are fixed-size types (`uint256`, `address`, `bytes32`).
-
-**17. ERC4626 Missing Allowance Check in withdraw() / redeem()**
-
-- **Detect:** `withdraw(assets, receiver, owner)` or `redeem(shares, receiver, owner)` where `msg.sender != owner` but no allowance validation or decrement is performed before burning shares. EIP-4626 requires that if `caller != owner`, the caller must hold sufficient share approval; the allowance must be consumed atomically. Missing this check lets any address burn shares from an arbitrary owner and redirect the assets to any receiver — equivalent to an unchecked `transferFrom`.
-- **FP:** `_spendAllowance(owner, caller, shares)` called unconditionally before the share burn when `caller != owner`. OpenZeppelin ERC4626 used without custom overrides of `withdraw`/`redeem`.
-
-**18. Delegatecall to Untrusted / User-Supplied Callee**
-
-- **Detect:** `address(target).delegatecall(data)` where `target` is user-provided or unconstrained. Callee executes in the caller's storage context - can overwrite owner, balances, call `selfdestruct`. (SWC-112)
-- **FP:** `target` is a hardcoded immutable verified library address that cannot be changed after deployment.
-
-**19. Front-Running Exact-Zero Balance Check with Dust Transfer**
+**13. Front-Running Exact-Zero Balance Check with Dust Transfer**
 
 - **Detect:** An `external` or `public` function contains `require(token.balanceOf(address(this)) == 0)`, `require(address(this).balance == 0)`, or any strict equality check against a zero balance that gates a state transition (e.g., starting an auction, initializing a pool, opening a deposit round). An attacker front-runs the legitimate caller's transaction by sending a dust amount of the token or ETH to the contract, making the balance non-zero and causing the victim's transaction to revert. The attack is repeatable at negligible cost, creating a permanent DoS on the guarded function. Distinct from Vector 39 (force-feeding ETH to break invariants) — this targets the zero-check gate itself as a griefing/DoS vector rather than inflating a balance used in financial math.
 - **FP:** Check uses `<=` threshold instead of `== 0` (e.g., `require(balance <= DUST_THRESHOLD)`). Function is access-controlled so only a trusted caller can trigger it. Balance is tracked via an internal accounting variable that ignores direct transfers, not via `balanceOf` or `address(this).balance`.
 
 ---
 
-**20. Non-Standard ERC20 Return Values (USDT-style)**
+**14. Cross-Chain Deployment Replay**
 
-- **Detect:** `require(token.transfer(to, amount))` reverts on tokens that return nothing (USDT, BNB). Or return value ignored entirely (silent failure on failed transfer). (SWC-104)
-- **FP:** OpenZeppelin `SafeERC20.safeTransfer()`/`safeTransferFrom()` used throughout.
+- **Detect:** A deployment transaction from one EVM chain is replayed on another chain. If the deployer EOA has the same nonce on both chains, the CREATE opcode produces the same contract address on the second chain — but now controlled by whoever replayed the transaction. The Wintermute incident demonstrated this: an attacker replayed a deployment transaction across EVM-compatible chains to gain control of the same address on multiple networks. Pattern: deployer EOA reused across chains without nonce management. Deployment transactions lack EIP-155 chain ID protection. Script deploys to multiple chains from the same EOA without verifying per-chain nonce state.
+- **FP:** Deployment transactions use EIP-155 (chain ID in v value of signature). Script uses `CREATE2` with a factory already deployed at the same address on all target chains (e.g., deterministic deployment proxies). Per-chain deployer EOAs or hardware wallets with chain-specific derivation paths.
 
-**21. Zero-Amount Transfer Revert Breaking Distribution Logic**
+**15. msg.value Reuse in Loop / Multicall**
 
-- **Detect:** Contract calls `token.transfer(recipient, amount)` or `token.transferFrom(from, to, amount)` where `amount` can be zero — e.g., when fees round to 0, a user claims before any yield accrues, or a distribution loop pays out a zero share. Some non-standard ERC20 tokens (LEND, early BNB, certain stablecoins) include `require(amount > 0)` in their transfer logic and revert on zero-amount calls. Any fee distribution loop, reward claim, or conditional-payout path that omits a `if (amount > 0)` guard will permanently DoS on these tokens.
-- **FP:** All transfer calls are preceded by `if (amount > 0)` or `require(amount > 0)`. Protocol enforces a minimum claim/distribution amount upstream. Supported token whitelist only includes tokens verified to accept zero-amount transfers (OZ ERC20 base allows them).
+- **Detect:** `msg.value` read inside a loop body, or inside a `delegatecall`-based multicall where each sub-call is dispatched via `address(this).delegatecall(data[i])`. `msg.value` is a transaction-level constant — it does not decrease as ETH is "spent" within the call. Direct loop: `for (uint i = 0; i < n; i++) { deposit(msg.value); }` credits `n × msg.value` while only `msg.value` was sent. Delegatecall multicall: each sub-call inherits the original `msg.value`, so including the same payable function `n` times receives credit for `n × msg.value` with one payment.
+- **FP:** `msg.value` captured into a local variable before the loop; that local is decremented per iteration and the contract enforces that total allocated equals the captured value. Function is non-payable. Multicall dispatches via `call` (not `delegatecall`), so each sub-call only receives ETH explicitly forwarded to it.
 
-**22. Uninitialized Implementation Takeover**
+**16. Missing or Expired Deadline on Swaps**
 
-- **Detect:** Implementation contract has an `initialize()` function but the constructor does not call `_disableInitializers()`. Anyone can call `initialize()` directly on the implementation (not the proxy), claim ownership, then call `upgradeTo()` to replace the implementation or `selfdestruct` via delegatecall. Pattern: UUPS/Transparent/Beacon implementation with `initializer` modifier but no `_disableInitializers()` in constructor. Real-world: Wormhole Bridge (2022), Parity Multisig Library (2017, ~$150M frozen).
-- **FP:** Constructor calls `_disableInitializers()`. `initializer` modifier from OpenZeppelin `Initializable` is present and correctly gates the function. Implementation verifies it is being called through a proxy before executing any logic.
+- **Detect:** `deadline = block.timestamp` (computed inside the tx, always valid), `deadline = type(uint256).max`, or no deadline at all. Transaction can be held in mempool and executed at any future price.
+- **FP:** Deadline is a calldata parameter validated on-chain as `require(deadline >= block.timestamp)` and is not derived from `block.timestamp` or set to `type(uint256).max` within the function itself.
 
-**23. ERC20 Non-Compliant: Return Values / Events**
-
-- **Detect:** Custom `transfer()`/`transferFrom()` doesn't return `bool`, or always returns `true` on failure. `mint()` missing `Transfer(address(0), to, amount)` event. `burn()` missing `Transfer(from, address(0), amount)`. `approve()` missing `Approval` event. Breaks DEX and wallet composability.
-- **FP:** OpenZeppelin `ERC20.sol` used as base with no custom overrides of the transfer/approve/event logic.
-
-**24. Block Timestamp Dependence**
-
-- **Detect:** `block.timestamp` used for game outcomes, randomness (`block.timestamp % N`), or auction timing where a 15-second manipulation changes the outcome. (SWC-116)
-- **FP:** Timestamp used only for periods spanning hours or days, where 15-second validator manipulation has no meaningful impact on the outcome. Timestamp used only for event logging with no effect on state or logic.
-
-**25. Deployment Transaction Front-Running (Ownership Hijack)**
-
-- **Detect:** Deployment script broadcasts a contract creation transaction to the public mempool without using a private/protected transaction relay. An attacker sees the pending deployment, extracts the bytecode, and deploys an identical contract first with themselves as the owner — or front-runs the initialization with different parameters. For token contracts, the attacker can deploy to a predictable address and pre-seed liquidity pairs to manipulate trading. Pattern: deployment transactions sent via public RPC (`eth_sendRawTransaction`) without Flashbots Protect, MEV Blocker, or a private mempool relay. Constructor sets `owner = msg.sender` or `admin = tx.origin` without additional verification.
-- **FP:** Deployment uses a private transaction relay (Flashbots Protect, MEV Blocker, private mempool). Owner address is passed as a constructor argument rather than derived from `msg.sender`. Deployment is on a chain without a public mempool (e.g., Arbitrum sequencer, private L2). Contract uses CREATE2 with a salt tied to the deployer's address.
-
-**26. Merkle Proof Reuse — Leaf Not Bound to Caller**
-
-- **Detect:** Merkle proof accepted without tying the leaf to `msg.sender`. Pattern: `require(MerkleProof.verify(proof, root, keccak256(abi.encodePacked(amount))))` or leaf contains only an address that is not checked against `msg.sender`. Anyone who observes the proof in the mempool can front-run and claim the same entitlement by submitting it from a different address.
-- **FP:** Leaf explicitly encodes the caller: `keccak256(abi.encodePacked(msg.sender, amount))`. Function validates that the leaf's embedded address equals `msg.sender` before acting. Proof is single-use and recorded as consumed after the first successful call.
-
-**27. Token Decimal Mismatch in Cross-Token Arithmetic**
-
-- **Detect:** Protocol multiplies or divides token amounts using a hardcoded `1e18` denominator or assumes all tokens share the same decimals. USDC has 6 decimals, WETH has 18 — a formula like `price = usdcAmount * 1e18 / wethAmount` is off by 1e12. Pattern: collateral ratio, LTV, interest rate, or exchange rate calculations that combine two tokens' amounts with no per-token decimal normalization. `token.decimals()` is never called, or is called but its result is not used in scaling factors.
-- **FP:** All amounts normalized to a canonical precision (WAD/RAY) immediately after transfer, using each token's actual `decimals()`. Explicit normalization factor `10 ** (18 - token.decimals())` applied per token before any cross-token arithmetic. Protocol only supports tokens with identical, verified decimals.
-
-**28. Missing Nonce (Signature Replay)**
-
-- **Detect:** Signed message has no per-user nonce, or nonce is present in the struct but never stored/incremented after use. Same valid signature can be submitted multiple times. (SWC-121)
-- **FP:** Monotonic per-signer nonce included in signed payload, stored, checked for reuse, incremented atomically. `usedSignatures[hash]` mapping invalidates after first use.
-
-**29. Upgrade Race Condition / Front-Running**
-
-- **Detect:** Upgrade transaction submitted to a public mempool, creating a window for front-running (exploit old implementation before upgrade lands) or back-running (exploit assumptions the new implementation breaks). Multi-step upgrades are especially dangerous: `upgradeTo(V2)` lands in block N but `setNewParams(...)` is still pending -- attacker sandwiches between them. Pattern: `upgradeTo()` and post-upgrade configuration calls are separate transactions; no private mempool or bundling used; V2 is not safe with V1's state parameters.
-- **FP:** Upgrade + initialization bundled into a single `upgradeToAndCall()` invocation. Flashbots Protect or private mempool used for upgrade transactions. V2 designed to be safe with V1's state from block 0. Timelock makes execution block predictable and protectable.
-
-**30. ERC1155 uri() Missing {id} Substitution Causes Metadata Collapse**
-
-- **Detect:** `uri(uint256 id)` returns a fully resolved URL (e.g., `"https://api.example.com/token/42"`) instead of a template containing the literal `{id}` placeholder as required by EIP-1155. Clients and marketplaces that follow the standard substitute the zero-padded 64-character hex token ID for `{id}` client-side — returning a fully resolved URL breaks this substitution, pointing all IDs to the same metadata endpoint or creating malformed double-substituted URLs. Additionally, if `uri(id)` returns an empty string or a hardcoded static value identical for all IDs, off-chain systems treat all tokens as identical, destroying per-token metadata and market value.
-- **FP:** `uri(id)` returns a string containing the literal `{id}` substring per EIP-1155 spec, and clients substitute the hex-encoded token ID. Protocol overrides `uri(id)` to return a fully unique per-ID on-chain URI (e.g., full base64-encoded JSON) and explicitly documents deviation from the `{id}` substitution requirement.
-
-**31. ERC721 / ERC1155 Type Confusion in Dual-Standard Marketplace**
-
-- **Detect:** Marketplace or aggregator handles both ERC721 and ERC1155 in a shared `buy` or `fill` function using a type flag, but the `quantity` parameter required for ERC1155 amount is also accepted for ERC721 without validation that it equals 1. Price is computed as `price * quantity`. An attacker passes `quantity = 0` for an ERC721 listing — price calculation yields zero, NFT transfers successfully, payment is zero. Root cause of the TreasureDAO exploit (March 2022, $1.4M): `buyItem(listingId, 0)` for an ERC721 listing passed all checks and transferred the NFT for free.
-- **FP:** ERC721 branch explicitly `require(quantity == 1)` before any price arithmetic. Separate code paths for ERC721 and ERC1155 with no shared quantity parameter. Price computed independently of quantity for ERC721 listings.
-
----
-
-**32. CREATE2 Address Squatting (Counterfactual Front-Running)**
-
-- **Detect:** A CREATE2-based deployment uses a salt that is not bound to the deployer's address (`msg.sender`). An attacker who knows the factory address, salt, and init code can precompute the deployment address and deploy there first (either via the same factory or a different one with matching parameters). For account abstraction wallets, this is especially dangerous: an attacker deploys a wallet to the user's counterfactual address with themselves as the owner, then receives funds intended for the legitimate user. Pattern: `CREATE2` salt is a user-supplied value, sequential counter, or derived from public data (e.g., `keccak256(username)`) without incorporating `msg.sender`. Factory's `deploy()` function is permissionless and does not bind salt to caller.
-- **FP:** Salt incorporates `msg.sender`: `salt = keccak256(abi.encodePacked(msg.sender, userSalt))`. Factory restricts who can deploy: `require(msg.sender == authorizedDeployer)`. Init code includes owner address in constructor arguments, so different owners produce different init code hashes and thus different CREATE2 addresses.
-
-**33. Signature Malleability**
+**17. Signature Malleability**
 
 - **Detect:** Raw `ecrecover(hash, v, r, s)` used without validating `s <= 0x7FFF...20A0`. Both `(v,r,s)` and `(v',r,s')` recover the same address. If signatures are used as unique identifiers (stored to prevent replay), a malleable variant bypasses the uniqueness check. (SWC-117)
 - **FP:** OpenZeppelin `ECDSA.recover()` used (validates `s` range and `v`). Full message hash used as dedup key, not the signature bytes.
 
-**34. ERC721/ERC1155 Callback Reentrancy**
+**18. Write to Arbitrary Storage Location**
 
-- **Detect:** `safeTransferFrom` (ERC721) or `safeMint`/`safeTransferFrom` (ERC1155) called before state updates. These invoke `onERC721Received`/`onERC1155Received` on recipient contracts.
-- **FP:** All state committed before the safe transfer. Function is `nonReentrant`.
+- **Detect:** (1) Assembly block with `sstore(slot, value)` where `slot` is derived from user-supplied calldata, function parameters, or arithmetic over user-controlled values without bounds validation — allows overwriting any slot including `owner`, `implementation`, or balance mappings. (2) (Solidity <0.6) Direct assignment to a storage array's `.length` field (`arr.length = userValue`) followed by an indexed write `arr[largeIndex] = x`. The storage slot for `arr[i]` is `keccak256(arraySlot) + i`; with a crafted large index, slot arithmetic wraps around and overwrites arbitrary slots. (SWC-124)
+- **FP:** Assembly is read-only (`sload` only, no `sstore`). Slot value is a compile-time constant or derived exclusively from non-user-controlled data (e.g., `keccak256("protocol.slot")` pattern). Solidity ≥0.6 used throughout (compiler disallows direct array length assignment). Slot arithmetic validated against a fixed known-safe range before use.
 
-**35. ERC721Enumerable Index Corruption on Burn or Transfer**
+**19. Hardcoded Network-Specific Addresses**
+
+- **Detect:** Deployment script or constructor contains hardcoded addresses for external dependencies (oracles, routers, tokens, registries) that differ across networks. When the script is reused on a different chain or testnet, these addresses point to wrong contracts, EOAs, or undeployed addresses — silently misconfiguring the system. A USDC address hardcoded for Ethereum mainnet resolves to an unrelated contract (or an EOA) on Arbitrum or Polygon. Pattern: literal `address(0x...)` constants in deployment scripts or constructor arguments that represent external protocol addresses. No per-chain configuration mapping or environment variable lookup.
+- **FP:** Addresses are loaded from a per-chain configuration file (JSON, TOML) keyed by chain ID. Script asserts `block.chainid` matches expected chain before using hardcoded addresses. Addresses are passed as constructor arguments from the deployment environment, not embedded in source. Deterministic addresses that are guaranteed identical across chains (e.g., CREATE2-deployed singletons like Permit2).
+
+**20. Weak On-Chain Randomness / Randomness Frontrunning**
+
+- **Detect:** Randomness from `block.prevrandao` (RANDAO, validator-influenceable), `blockhash(block.number - 1)` (known before inclusion), `block.timestamp`, `block.coinbase`, or combinations. Validators can influence RANDAO; all block values are visible before tx inclusion, enabling front-running of randomness-dependent outcomes. (SWC-120)
+- **FP:** Chainlink VRF v2+ used. Commit-reveal scheme with future-block reveal and a meaningful economic penalty (slashing or bond forfeiture) enforced in code for non-reveal.
+
+**21. ERC4626 Inflation Attack (First Depositor)**
+
+- **Detect:** Vault shares math: `shares = assets * totalSupply / totalAssets`. When `totalSupply == 0`, attacker deposits 1 wei, donates large amount to vault, victim's deposit rounds to 0 shares. No virtual offset or dead shares protection.
+- **FP:** OpenZeppelin ERC4626 with `_decimalsOffset()` override. Dead shares minted to `address(0)` at init.
+
+**22. ERC1155 onERC1155Received Return Value Not Validated**
+
+- **Detect:** Custom ERC1155 implementation calls `IERC1155Receiver(to).onERC1155Received(operator, from, id, value, data)` when transferring to a contract address, but does not check that the returned `bytes4` equals `IERC1155Receiver.onERC1155Received.selector` (`0xf23a6e61`). A recipient contract that returns any other value (including `bytes4(0)` or nothing) should cause the transfer to revert per EIP-1155, but without the check the transfer silently succeeds. Tokens are permanently locked in a contract that cannot handle them.
+- **FP:** OZ ERC1155 used as base — it validates the selector and reverts with `ERC1155InvalidReceiver` on mismatch. Custom implementation explicitly checks: `require(retval == IERC1155Receiver.onERC1155Received.selector, "ERC1155: rejected")`.
+
+---
+
+**23. Rounding in Favor of the Attacker**
+
+- **Detect:** `shares = assets / pricePerShare` rounds down for the user but up for shares redeemed. First-depositor vault manipulation: when `totalSupply == 0`, attacker donates to inflate `totalAssets`, subsequent deposits round to 0 shares. Division without explicit rounding direction.
+- **FP:** `Math.mulDiv(a, b, c, Rounding.Up)` used with explicit rounding direction appropriate for the operation. Virtual offset (OpenZeppelin ERC4626 `_decimalsOffset()`) prevents first-depositor attack. Dead shares minted to `address(0)` at init.
+
+**24. NFT Staking / Escrow Records msg.sender Instead of ownerOf**
+
+- **Detect:** Staking or escrow contract accepts an ERC721 via `nft.transferFrom(msg.sender, address(this), tokenId)` and records `depositor[tokenId] = msg.sender`. An operator (approved but not the owner) can call `stake(tokenId)` — the transfer succeeds because the operator holds approval, but `msg.sender` is the operator, not the real owner. The real owner loses their NFT; the operator is credited as depositor and receives all staking rewards and the right to unstake. Pattern: `depositor[tokenId] = msg.sender` without cross-checking against `nft.ownerOf(tokenId)` before the transfer.
+- **FP:** Contract reads `address realOwner = nft.ownerOf(tokenId)` before accepting the transfer and records `depositor[tokenId] = realOwner`. Or requires `require(nft.ownerOf(tokenId) == msg.sender, "not owner")` so operators cannot stake on others' behalf.
+
+**25. Immutable Variable Context Mismatch**
+
+- **Detect:** Implementation contract uses `immutable` variables set in its constructor. These are embedded in bytecode, not storage -- so when a proxy `delegatecall`s, it gets the implementation's hardcoded values regardless of per-proxy configuration needs. If the implementation is shared across multiple proxies or chains, all proxies see the same immutable values. Pattern: `address public immutable WETH` in implementation constructor -- every proxy gets the same WETH address regardless of chain.
+- **FP:** Immutable values are intentionally identical across all proxies (e.g. a protocol-wide constant). Per-proxy configuration uses storage variables set in `initialize()`. Implementation is purpose-deployed per proxy with correct constructor args.
+
+**26. extcodesize Zero / isContract Bypass in Constructor**
+
+- **Detect:** Access control or anti-bot check uses `require(msg.sender.code.length == 0)` or assembly `extcodesize(caller())` to assert the caller is an EOA. During a contract's constructor execution, `extcodesize` of that contract's own address returns zero — no code is stored until construction finishes. An attacker deploys a contract whose constructor calls the protected function, bypassing the check. Common targets: minting limits, presale allocation caps, "no smart contracts" whitelist enforcement.
+- **FP:** The check is informational only and not security-critical. The function is independently protected by a merkle-proof allowlist, signed permit, or other mechanism that cannot be satisfied inside a constructor. Protocol explicitly states and accepts on-chain contract interaction.
+
+**27. ERC721Enumerable Index Corruption on Burn or Transfer**
 
 - **Detect:** Contract extends `ERC721Enumerable` and overrides `_beforeTokenTransfer` (OZ v4) or `_update` (OZ v5) without calling the corresponding `super` function. `ERC721Enumerable` maintains four interdependent index structures (`_ownedTokens`, `_ownedTokensIndex`, `_allTokens`, `_allTokensIndex`) that must be updated atomically on every mint, burn, and transfer. Skipping the super call leaves stale entries — `tokenOfOwnerByIndex` returns wrong token IDs, `ownerOf` for enumerable lookups resolves incorrectly, and `totalSupply` diverges from actual supply.
 - **FP:** Override always calls `super._beforeTokenTransfer(from, to, tokenId, batchSize)` or `super._update(to, tokenId, auth)` as its first statement. Contract does not inherit `ERC721Enumerable` and tracks supply independently.
 
-**36. Missing Chain ID Validation in Deployment Configuration**
+**28. Block Stuffing / Gas Griefing on Subcalls**
 
-- **Detect:** Deployment script reads RPC endpoint and chain parameters from environment variables or config files without validating that the connected chain matches the intended target. A misconfigured `RPC_URL` (e.g., mainnet URL in a staging config, or a compromised/rogue RPC endpoint) causes the script to deploy to the wrong chain with real funds, or to a chain where the deployment has different security assumptions. Pattern: script reads `$RPC_URL` from `.env` without calling `eth_chainId` and asserting it matches the expected value. Foundry script without `--chain-id` flag or `block.chainid` assertion. No dry-run or simulation step before broadcast.
-- **FP:** Script asserts `require(block.chainid == expectedChainId)` at the start. Foundry `--verify` flag combined with explicit `--chain` parameter. CI/CD pipeline validates chain ID before executing deployment. Multi-chain deployment framework (e.g., Foundry multi-fork) with per-chain config validated against RPC responses.
+- **Detect:** Time-sensitive function can be blocked by filling blocks (SWC-126). For relayer gas-forwarding griefing via the 63/64 rule, see Vector 47.
+- **FP:** Function is not time-sensitive or has a sufficiently long window that block stuffing is economically infeasible.
 
-**37. Paymaster Gas Penalty Undercalculation**
+**29. Chainlink Feed Deprecation / Wrong Decimal Assumption**
 
-- **Detect:** Paymaster computes the prefund amount as `requiredPreFund + (refundPostopCost * maxFeePerGas)` without including the 10% penalty the EntryPoint applies to unused execution gas (`postOpUnusedGasPenalty`). When a UserOperation specifies a large `executionGasLimit` and uses little of it, the EntryPoint deducts a penalty the paymaster did not budget for, draining its deposit. Pattern: prefund formula lacks any reference to unused-gas penalty or `_getUnusedGasPenalty`.
-- **FP:** Prefund calculation explicitly adds the unused-gas penalty: `requiredPreFund + penalty + (refundCost * price)`. Paymaster uses conservative overestimation that covers worst-case penalty.
+- **Detect:** (a) Chainlink aggregator address is hardcoded in the constructor or an immutable with no admin path to update it. When Chainlink deprecates the feed and migrates to a new aggregator contract, the protocol continues reading from the frozen old feed, which may return a stale or zeroed price indefinitely. (b) Price normalization assumes `feed.decimals() == 8` (common for USD feeds) without calling `feed.decimals()` at runtime. Some feeds (e.g., ETH/ETH) return 18 decimals — the 10^10 scaling discrepancy produces wildly wrong collateral values, enabling instant over-borrowing or mass liquidations.
+- **FP:** Feed address is updatable via a governance-gated setter. `feed.decimals()` called and stored; used to normalize `latestRoundData().answer` before any arithmetic. Deviation check against a secondary oracle rejects anomalous values.
 
-**38. Off-By-One in Bounds or Range Checks**
+**30. Zero-Amount Transfer Revert Breaking Distribution Logic**
 
-- **Detect:** (1) Loop upper bound uses `<=` instead of `<` on an array index: `for (uint i = 0; i <= arr.length; i++)` — accesses `arr[arr.length]` on the final iteration, reverting or reading uninitialized memory. (2) `arr[arr.length - 1]` or `arr[index - 1]` without a preceding `require(arr.length > 0)` / `require(index > 0)` — in `unchecked` blocks the underflow silently wraps to a huge index. (3) Inclusive/exclusive boundary confusion in financial logic: `require(block.timestamp >= vestingEnd)` vs. `> vestingEnd`, or `require(amount <= MAX)` where MAX was intended as exclusive — one unit of difference causes early unlock or allows a boundary-exceeding deposit. (4) Cumulative distribution: allocating a total across N recipients using integer division, where rounding errors accumulate and the final recipient receives more or less than intended.
-- **FP:** Loop uses `<` not `<=` and the upper bound is a fixed-length array or a compile-time constant — overflow into out-of-bounds is structurally impossible. Last-element access is always preceded by a `require(arr.length > 0)` or equivalent in the same scope. Financial boundary comparisons (`>=` vs `>`) are demonstrably correct for the invariant being enforced (e.g., `>= vestingEnd` for an inclusive deadline, `< MAX` for an exclusive cap).
+- **Detect:** Contract calls `token.transfer(recipient, amount)` or `token.transferFrom(from, to, amount)` where `amount` can be zero — e.g., when fees round to 0, a user claims before any yield accrues, or a distribution loop pays out a zero share. Some non-standard ERC20 tokens (LEND, early BNB, certain stablecoins) include `require(amount > 0)` in their transfer logic and revert on zero-amount calls. Any fee distribution loop, reward claim, or conditional-payout path that omits a `if (amount > 0)` guard will permanently DoS on these tokens.
+- **FP:** All transfer calls are preceded by `if (amount > 0)` or `require(amount > 0)`. Protocol enforces a minimum claim/distribution amount upstream. Supported token whitelist only includes tokens verified to accept zero-amount transfers (OZ ERC20 base allows them).
 
-**39. ERC4626 Mint/Redeem Asset-Cost Asymmetry**
+**31. Flash Loan-Assisted Price Manipulation**
 
-- **Detect:** For the same share count `s`, `redeem(s)` returns more assets than `mint(s)` costs — so cycling redeem → remint yields a net profit on every loop. Equivalently, `mint(redeem(s).shares)` costs fewer assets than `redeem(s)` returned. Root cause: `_convertToAssets` rounds up in `redeem` (user receives more) and rounds down in `mint` (user pays less), the opposite of what EIP-4626 requires. The spec mandates that `redeem` rounds down (vault keeps the rounding error) and `mint` rounds up (user pays the rounding error). Pattern: `previewRedeem` and `redeem` call `_convertToAssets(shares, Rounding.Ceil)` while `previewMint` and `mint` call `_convertToAssets(shares, Rounding.Floor)`. The delta between the two is extractable per cycle. (Covers `prop_RT_mint_redeem` and `prop_RT_redeem_mint` from the a16z ERC4626 property test suite.)
-- **FP:** `redeem`/`previewRedeem` call `_convertToAssets(shares, Math.Rounding.Floor)` and `mint`/`previewMint` call `_convertToAssets(shares, Math.Rounding.Ceil)`. OpenZeppelin ERC4626 used without custom conversion overrides.
+- **Detect:** A function reads price/ratio from an on-chain source (AMM reserves, vault `totalAssets()`), and that source can be manipulated atomically in the same tx via flash loan + swap. Attacker sequence: borrow → move price → call function → restore → repay.
+- **FP:** Price source is TWAP with a 30-minute or longer observation window. Multi-block cooldown enforced between price reads. Function can only be called in a separate block from any state that could be manipulated.
+
+**32. ERC721A / Lazy Ownership — ownerOf Uninitialized in Batch Range**
+
+- **Detect:** Contract uses ERC721A (or OpenZeppelin `ERC721Consecutive`) for gas-efficient batch minting. Ownership is stored lazily: only the first token of a consecutive run has its ownership struct written; all subsequent IDs in the range inherit it by binary search. Before any transfer occurs, `ownerOf(id)` for IDs in the middle of a batch may return `address(0)` or the batch-start owner depending on implementation version. Access control that calls `ownerOf(tokenId) == msg.sender` on freshly minted tokens without an explicit transfer may fail or return incorrect results. Pattern: `require(ownerOf(tokenId) == msg.sender)` in a staking or approval function called immediately after a batch mint.
+- **FP:** Protocol always waits for an explicit `transferFrom` or `safeTransferFrom` before checking ownership (each transfer initializes the packed slot). Contract uses standard OZ `ERC721` where every mint writes `_owners[tokenId]` directly.
+
+**33. Bytecode Verification Mismatch (Source-to-Deployment Discrepancy)**
+
+- **Detect:** The source code verified on a block explorer (Etherscan, Sourcify) does not faithfully represent the deployed bytecode's behavior. This can happen through: (a) different compiler settings (optimizer runs, EVM version) producing semantically different bytecode from the same source; (b) constructor arguments that alter behavior but are not visible in the verified source; (c) deliberately crafted source that passes verification but contains obfuscated malicious logic (e.g., a second contract in the same file with phishing/scam code verified under the victim's address). Research has shown that verification services can be abused to associate misleading source code with deployed contracts. Pattern: deployment script uses different `solc` version or optimizer settings than the verification step. Constructor arguments encode addresses or parameters not visible in source. Verification submitted with `--via-ir` but compilation used legacy pipeline (or vice versa). No reproducible build (no committed `foundry.toml` / `hardhat.config.ts` with pinned compiler settings).
+- **FP:** Deterministic build: `foundry.toml` or `hardhat.config.ts` committed with pinned compiler version and optimizer settings. Verification is part of the deployment script (Foundry `--verify`, Hardhat `verify` task) using identical settings. Sourcify full match (metadata hash matches). Constructor arguments are ABI-encoded and published alongside verification.
 
 ---
 
-**40. Blacklistable or Pausable Token in Critical Payment Path**
+**34. Insufficient Gas Forwarding / 63/64 Rule Exploitation**
 
-- **Detect:** Protocol hard-codes or accepts USDC, USDT, or another token with admin-controlled blacklisting or global pause, and routes payments through a push model: `token.transfer(recipient, amount)`. If `recipient` is blacklisted by the token issuer, or the token is globally paused, every push to that address reverts — permanently bricking withdrawals, liquidations, fee collection, or reward claims. Attacker can weaponize this by ensuring a critical address (vault, fee receiver, required counterparty) is blacklisted. Also relevant: protocol sends fee to a fixed `feeRecipient` inside a state-changing function — if `feeRecipient` is blacklisted, the entire function is permanently DOSed.
-- **FP:** Pull-over-push: recipients withdraw their own funds; a blacklisted recipient only blocks themselves. Skip-on-failure logic (`try/catch`) used for fee or reward distribution. Supported token whitelist explicitly excludes blacklistable/pausable tokens.
+- **Detect:** Contract forwards an external call without enforcing a minimum gas budget: `target.call(data)` (no explicit gas) or `target.call{gas: userProvidedGas}(data)`. The EVM's 63/64 rule means the callee receives at most 63/64 of the remaining gas. In meta-transaction and relayer patterns, a malicious relayer provides just enough gas for the outer function to complete but not enough for the subcall to succeed. The subcall returns `(false, "")` — which the outer function may misread as a business-logic rejection, marking the user's transaction as "processed" while the actual effect never happened. Silently censors user intent while consuming their allocated gas/fee.
+- **FP:** `gasleft()` validated against a minimum threshold before the subcall: `require(gasleft() >= minGas)`. Return value and return data both checked after the call. Relayer pattern uses EIP-2771 with a verified gas parameter that the recipient contract re-validates.
 
-**41. Nonce Gap from Reverted Transactions (CREATE Address Mismatch)**
+**35. Read-Only Reentrancy**
+
+- **Detect:** Protocol calls a `view` function (e.g., `get_virtual_price()`, `totalAssets()`, `convertToAssets()`) on an external contract from within a callback (`receive`, `onERC721Received`, flash loan hook). The external contract has no reentrancy guard on its view functions - a mid-execution call can return a transitional/manipulated value.
+- **FP:** External contract's view functions are themselves `nonReentrant`. Protocol uses Chainlink or another oracle instead of the external view. External contract's reentrancy lock is public and the protocol reads and enforces it before calling any view function.
+
+**36. ERC4626 Round-Trip Profit Extraction**
+
+- **Detect:** A full operation cycle yields strictly more than the starting amount: `redeem(deposit(a)) > a`, `deposit(redeem(s)) > s`, `mint(withdraw(a)) > a`, or `withdraw(mint(s)) > s`. Possible when rounding errors in `_convertToShares` and `_convertToAssets` both truncate in the user's favor, so no value is lost in either direction and a net gain emerges with large inputs or a manipulated share price. Combined with the first-depositor inflation attack (Vector 86), the share price can be engineered so that round-trip profit scales with the amount — enabling systematic value extraction.
+- **FP:** Rounding directions satisfy EIP-4626: shares issued on deposit/mint round down (vault-favorable), shares burned on withdraw/redeem round up (vault-favorable). OpenZeppelin ERC4626 with `_decimalsOffset()` used.
+
+**37. Missing chainId / Message Uniqueness in Bridge**
+
+- **Detect:** Bridge/messaging contract processes incoming messages but lacks: `processedMessages[messageHash]` check (replay), `destinationChainId == block.chainid` validation, or source chain ID in the message hash. A message from Chain A to Chain B can be replayed on Chain C, or submitted twice on the destination.
+- **FP:** Each message has a unique nonce per sender. Hash of `(sourceChain, destinationChain, nonce, payload)` stored in `processedMessages` and checked before execution. Contract address included in message hash.
+
+**38. Diamond Shared-Storage Cross-Facet Corruption**
+
+- **Detect:** EIP-2535 Diamond proxy where facets declare storage variables without EIP-7201 namespaced storage structs -- each facet using plain `uint256 foo` or `mapping(...)` declarations that Solidity places at sequential storage slots 0, 1, 2, .... Different facets independently start at slot 0, so both write to the same slot. A compromised or buggy facet can corrupt the entire Diamond's state. Pattern: facet with top-level state variable declarations (no `DiamondStorage` struct at a namespaced slot).
+- **FP:** All facets store state exclusively in a single `DiamondStorage` struct retrieved via `assembly { ds.slot := DIAMOND_STORAGE_POSITION }` using a namespaced position (EIP-7201 formula). No facet declares top-level state variables. OpenZeppelin's ERC-7201 `@custom:storage-location` pattern used correctly.
+
+**39. Transparent Proxy Admin Routing Confusion**
+
+- **Detect:** Transparent proxy routes calls from the admin address to proxy admin functions, and all other calls to the implementation. If the admin address accidentally interacts with the protocol as a user (e.g. deposits, withdraws), the call hits proxy admin routing instead of being delegated -- silently failing or executing unintended logic. Pattern: admin EOA or contract also used for regular protocol interactions; `ProxyAdmin` contract doubles as treasury or operator.
+- **FP:** Dedicated `ProxyAdmin` contract used exclusively for admin calls, never for protocol interaction. OpenZeppelin `TransparentUpgradeableProxy` pattern enforces separate admin contract. Admin address documented and known to never make user-facing calls.
+
+**40. Nonce Gap from Reverted Transactions (CREATE Address Mismatch)**
 
 - **Detect:** Deployment script uses `CREATE` (not CREATE2) and pre-computes expected contract addresses based on the deployer's nonce. If any transaction reverts or if an unrelated transaction is sent from the deployer EOA between script runs, the nonce advances but no contract is deployed. Subsequent deployments land at different addresses than expected, and contracts that were pre-configured to reference the expected addresses now point to empty addresses or wrong contracts. Pattern: script pre-computes addresses via `address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), deployer, nonce)))))` and hardcodes them into other contracts. Multiple scripts share the same deployer EOA without coordinated nonce management. Deployment script assumes a specific starting nonce.
 - **FP:** `CREATE2` used with deterministic addressing (nonce-independent). Script reads current nonce from chain via `eth_getTransactionCount` before computing addresses. Addresses are captured from actual deployment receipts and passed forward, never pre-assumed. Dedicated deployer EOA used per deployment (fresh nonce = 0).
 
-**42. Nested Mapping Inside Struct Not Cleared on `delete`**
+**41. Single-Function Reentrancy**
 
-- **Detect:** `delete myMapping[key]` or `delete myArray[i]` where the deleted item is a struct containing a `mapping` or a dynamic array. Solidity's `delete` zeroes primitive fields but does not recursively clear mappings — the nested mapping's entries persist in storage. If the same key is later reused (e.g., a re-deposited user, re-created proposal), old mapping values are unexpectedly visible. Pattern: struct with `mapping(address => uint256)` or `uint256[]` field; `delete` called on the struct without manually iterating and clearing the nested mapping.
-- **FP:** Nested mapping manually cleared before `delete` (iterate and zero every entry). Struct key is never reused after deletion. Codebase explicitly accounts for residual mapping values in subsequent reads (always initialises before use).
+- **Detect:** External call (`call{value:}`, `transfer`, `send`, `safeTransfer`, `safeTransferFrom`) happens _before_ state update (balance set to 0, flag set, counter decremented). Classic: check-external-effect instead of check-effect-external.
+- **FP:** State updated before the call (CEI followed). `nonReentrant` modifier present. Callee is a hardcoded immutable address of a contract whose receive/fallback is known to not re-enter.
 
-**43. ERC1155 ID-Based Role Access Control With Publicly Mintable Role Tokens**
+**42. Beacon Proxy Single-Point-of-Failure Upgrade**
 
-- **Detect:** Protocol implements access control by checking ERC1155 token balance: `require(balanceOf(msg.sender, ADMIN_ROLE_ID) > 0)` or `require(balanceOf(msg.sender, MINTER_ROLE_ID) >= 1)`. The role token IDs (`ADMIN_ROLE_ID`, `MINTER_ROLE_ID`) are public constants. If the ERC1155 `mint` function for those IDs is not separately access-controlled — e.g., it's callable by any holder of a lower-tier token, or via a public presale — any attacker can acquire the role token and gain elevated privileges. Role tokens are also transferable by default, creating a secondary market for protocol permissions.
-- **FP:** Minting of all role-designated token IDs is gated behind a separate access control system (e.g., OZ `AccessControl` with `MINTER_ROLE` on the ERC1155 contract itself). Role tokens for privileged IDs are non-transferable: `_beforeTokenTransfer` reverts for those IDs when `from != address(0) && to != address(0)`. Protocol uses a dedicated non-token access control system rather than ERC1155 balances for privilege gating.
+- **Detect:** Multiple proxies read their implementation address from a single Beacon contract. Compromising the Beacon owner upgrades all proxies simultaneously. Pattern: `UpgradeableBeacon` with `owner()` returning a single EOA; tens or hundreds of `BeaconProxy` instances pointing to it. A single `upgradeTo()` on the Beacon replaces logic for every proxy at once.
+- **FP:** Beacon owner is a multisig + timelock. `Upgraded` events on the Beacon are monitored for unauthorized changes. Per-proxy upgrade authority used where risk tolerance requires isolation.
 
-**44. Missing onERC1155BatchReceived Causes Token Lock on Batch Transfer**
+**43. EIP-2981 Royalty Signaled But Never Enforced**
 
-- **Detect:** Receiving contract implements `IERC1155Receiver.onERC1155Received` (for single transfers) but not `IERC1155Receiver.onERC1155BatchReceived` (for batch transfers), or implements the latter returning a wrong selector. `safeBatchTransferFrom` to such a contract reverts on the callback check, permanently preventing batch delivery. Protocol that accepts individual deposits from users but attempts batch settlement or batch reward distribution internally will be permanently stuck if the recipient is one of these incomplete receivers. Pattern: `onERC1155BatchReceived` is absent, `returns (bytes4(0))`, or reverts unconditionally.
-- **FP:** Contract implements both `onERC1155Received` and `onERC1155BatchReceived` returning the correct selectors, or inherits from OZ `ERC1155Holder` which provides both. Protocol's internal settlement exclusively uses single-item `safeTransferFrom` and is documented to never issue batch calls to contract recipients.
+- **Detect:** Contract implements `IERC2981.royaltyInfo(tokenId, salePrice)` and `supportsInterface(0x2a55205a)` returns `true`, advertising royalty support. However, the protocol's own transfer, listing, or settlement logic never calls `royaltyInfo()` and never routes payment to the royalty recipient. EIP-2981 is a signaling standard — it cannot force payment. Any marketplace that does not voluntarily query and pay royalties will bypass them entirely. Pattern: `royaltyInfo()` implemented, but `transferFrom` and all settlement paths contain no corresponding payment call.
+- **FP:** Protocol's own marketplace or settlement contract reads `royaltyInfo()` and transfers the royalty amount to the recipient before or after completing the sale — enforced on-chain. Royalties are intentionally zero (`royaltyBps = 0`) and this is documented.
+
+**44. Precision Loss - Division Before Multiplication**
+
+- **Detect:** Expression `(a / b) * c` in integer math. Division truncates first, then multiplication amplifies the error. Common in fee calculations: `fee = (amount / 10000) * bps`. Correct form: `(a * c) / b`.
+- **FP:** `a` is provably divisible by `b` — enforced by a preceding explicit check (e.g., `require(a % b == 0)`) or by mathematical construction visible in the code.
+
+**45. Upgrade Race Condition / Front-Running**
+
+- **Detect:** Upgrade transaction submitted to a public mempool, creating a window for front-running (exploit old implementation before upgrade lands) or back-running (exploit assumptions the new implementation breaks). Multi-step upgrades are especially dangerous: `upgradeTo(V2)` lands in block N but `setNewParams(...)` is still pending -- attacker sandwiches between them. Pattern: `upgradeTo()` and post-upgrade configuration calls are separate transactions; no private mempool or bundling used; V2 is not safe with V1's state parameters.
+- **FP:** Upgrade + initialization bundled into a single `upgradeToAndCall()` invocation. Flashbots Protect or private mempool used for upgrade transactions. V2 designed to be safe with V1's state from block 0. Timelock makes execution block predictable and protectable.
