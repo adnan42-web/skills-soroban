@@ -7,27 +7,25 @@
 
 ---
 
-## Skills
+## Install & Run
 
-| Skill                  | Description                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------ |
-| [audit](skills/audit/) | Fast security feedback on Solidity changes while you develop (typically <5 min)|
+Works with Claude Code in **VS Code**, **Cursor**, and the terminal. Clone this repo, then copy any skill folder into Claude Code's commands directory:
+
+```bash
+cp -r skills/<skill-name> ~/.claude/commands/
+```
+
+The skill is then invocable as `/<skill-name>` (e.g., `/audit`).
+
+> **Tip:** Open a second terminal on the side, run the skill there, and keep coding in your main terminal.
 
 ---
 
-## Install & Run
+## Skills
 
-Works with Claude Code in **VS Code**, **Cursor**, and the terminal. Clone this repo, then copy the skill folder into Claude Code's commands directory.
-
-**Global** — available in every project:
-
-```bash
-cp -r skills/audit ~/.claude/commands/
-```
-
-The skill is then invocable as `/audit`.
-
-> **Tip:** Open a second terminal on the side, run `/audit` there, and keep coding in your main terminal. A typical run takes ~5 minutes.
+| Skill                  | Description                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------- |
+| [audit](skills/audit/) | Fast (typically <5 min) security feedback on Solidity changes while you develop |
 
 ---
 
