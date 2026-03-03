@@ -26,7 +26,7 @@ The skill is then invocable as `/<skill-name>` (e.g., `/solidity-auditor`).
 
 | Skill                                        | Description                                                                     |
 | -------------------------------------------- | ------------------------------------------------------------------------------- |
-| [solidity-auditor](skills/solidity-auditor/) | Fast (typically <5 min) security feedback on Solidity changes while you develop |
+| [solidity-auditor](solidity-auditor/) | Fast (typically <5 min) security feedback on Solidity changes while you develop |
 
 ---
 

@@ -10,7 +10,7 @@ Built for **Solidity devs** who want a security check before every commit, **sec
 
 ## Demo
 
-![Running solidity-auditor in terminal](../../static/skill_pag.gif)
+![Running solidity-auditor in terminal](../static/skill_pag.gif)
 
 ## Usage
 
