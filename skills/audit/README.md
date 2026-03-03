@@ -40,3 +40,7 @@ In deep mode, a fifth agent (Opus) reasons adversarially from first principles �
 Most runs complete in 3–5 minutes. Wall-clock is determined by the slowest agent, not the sum of all agents.
 
 Expect ~100k–250k tokens depending on scope (200–2,000 lines of Solidity). DEEP mode adds ~25-30% on top. Token spend scales with the number of in-scope files — each scanning agent reads every file, so a single-file review will use significantly fewer tokens.
+
+## Limitations
+
+Performance degrades on codebases exceeding ~4,000 lines of in-scope Solidity. Agents hit context limits, findings get less precise, and token costs spike. For large codebases, run the skill on logical chunks (e.g., per module or per contract group) rather than the full repo in a single pass — you'll get better coverage and more actionable results.
