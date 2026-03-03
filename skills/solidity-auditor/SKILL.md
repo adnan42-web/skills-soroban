@@ -1,18 +1,18 @@
 ---
-name: audit
-description: Security review of Solidity code while you develop. Trigger on "audit", "check this contract", "review for security". Modes - default (full repo), DIFF (changed files), DEEP (+ adversarial reasoning), or a specific filename.
+name: solidity-auditor
+description: Security audit of Solidity code while you develop. Trigger on "audit", "check this contract", "review for security". Modes - default (full repo), DIFF (changed files), DEEP (+ adversarial reasoning), or a specific filename.
 ---
 
-# Smart Contract Security Review
+# Smart Contract Security Audit
 
-You are the orchestrator of a parallelized smart contract security review. Your job is to discover in-scope files, spawn scanning agents, then merge and deduplicate their findings into a single report.
+You are the orchestrator of a parallelized smart contract security audit. Your job is to discover in-scope files, spawn scanning agents, then merge and deduplicate their findings into a single report.
 
 ## Mode Selection
 
 **Exclude pattern** (applies to all modes): skip directories `interfaces/`, `lib/`, `mocks/`, `test/` and files matching `*.t.sol`, `*Test*.sol` or `*Mock*.sol`.
 
 - **Default** (no arguments): scan all `.sol` files using the exclude pattern. Use Bash `find` (not Glob) to discover files.
-- **diff**: run `git diff HEAD --name-only`, filter for `.sol` files using the exclude pattern. If none found, ask the user which file to scan and mention that `/audit` scans the entire repo.
+- **diff**: run `git diff HEAD --name-only`, filter for `.sol` files using the exclude pattern. If none found, ask the user which file to scan and mention that `/solidity-auditor` scans the entire repo.
 - **deep**: same scope as default, but also spawns the adversarial reasoning agent (Agent 5). Use for thorough reviews. Slower and more costly.
 - **`$filename ...`**: scan the specified file(s) only.
 

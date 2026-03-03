@@ -20,7 +20,7 @@ Pre-release versions are tagged as `v1.0.0-beta.1`, `v1.0.0-rc.1`, etc.
 ## [Unreleased]
 
 ### Added
-- `audit` skill — fast security feedback on Solidity changes during development
+- `solidity-auditor` skill — fast security feedback on Solidity changes during development
 - Plugin manifest (`.claude-plugin/plugin.json`) and `marketplace.json` for Claude plugin distribution
 - Repository scaffolding: `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`
 - GitHub issue and PR templates
@@ -35,7 +35,7 @@ Pre-release versions are tagged as `v1.0.0-beta.1`, `v1.0.0-rc.1`, etc.
 - New `skills/my-skill` skill
 
 ### Changed
-- Improved prompt in `skills/audit`
+- Improved prompt in `skills/solidity-auditor`
 
 ### Removed
 - Deprecated `skills/old-skill`

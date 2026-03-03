@@ -16,7 +16,7 @@ git clone https://github.com/pashov/skills.git
 cp -r skills/<skill-name> ~/.claude/commands/<skill-name>
 ```
 
-The skill is then invocable as `/<skill-name>` (e.g., `/audit`).
+The skill is then invocable as `/<skill-name>` (e.g., `/solidity-auditor`).
 
 > **Tip:** Open a second terminal on the side, run the skill there, and keep coding in your main terminal.
 
@@ -26,13 +26,7 @@ The skill is then invocable as `/<skill-name>` (e.g., `/audit`).
 
 | Skill                  | Description                                                                     |
 | ---------------------- | ------------------------------------------------------------------------------- |
-| [audit](skills/audit/) | Fast (typically <5 min) security feedback on Solidity changes while you develop |
-
----
-
-## See Pashov Skills in Action
-
-![Pashov Skills Demo](static/skill_pag.gif)
+| [solidity-auditor](skills/solidity-auditor/) | Fast (typically <5 min) security feedback on Solidity changes while you develop |
 
 ---
 

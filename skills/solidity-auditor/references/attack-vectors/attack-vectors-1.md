@@ -1,6 +1,6 @@
 # Attack Vectors Reference (1/4)
 
-170 total attack vectors. For each: detection pattern and false-positive signals.
+168 total attack vectors
 
 ---
 
@@ -56,6 +56,8 @@
 
 ---
 
+---
+
 **11. ERC1155 safeBatchTransferFrom Unchecked Array Lengths**
 
 - **D:** Custom `_safeBatchTransferFrom` iterates `ids`/`amounts` without `require(ids.length == amounts.length)`. Assembly-optimized paths may silently read uninitialized memory.
@@ -105,6 +107,8 @@
 
 - **D:** Implementation uses `immutable` variables (embedded in bytecode, not storage). Proxy `delegatecall` gets implementation's hardcoded values regardless of per-proxy needs. E.g., `immutable WETH` — every proxy gets same address.
 - **FP:** Immutable values intentionally identical across all proxies. Per-proxy config uses storage via `initialize()`.
+
+---
 
 ---
 
@@ -160,6 +164,8 @@
 
 ---
 
+---
+
 **31. Immutable / Constructor Argument Misconfiguration**
 
 - **D:** Constructor sets `immutable` values (admin, fee, oracle, token) that can't change post-deploy. Multiple same-type `address` params where order can be silently swapped. No post-deploy verification.
@@ -185,44 +191,41 @@
 - **D:** Loop distributes funds proportionally: `share = total * weight[i] / totalWeight`. Cumulative rounding causes `sum(shares) < total`, leaving dust locked in contract. Pattern: N recipients each computed independently without remainder handling.
 - **FP:** Last recipient gets `total - sumOfPrevious`. Dust swept to treasury. `mulDiv` with accumulator tracking. Protocol accepts bounded dust loss by design.
 
-**36. Admin Parameter Mutation During Active Protocol State**
-
-- **D:** Owner can change critical parameters (fee rates, oracle addresses, calculation contracts, token addresses) while operations are in flight (active loans, pending settlements, open auctions). New parameter values applied retroactively to already-committed state, breaking invariants or altering expected outcomes mid-operation.
-- **FP:** Parameters snapshotted per-epoch/per-operation at initiation time. Timelock on parameter changes. Changes only take effect for new operations, not in-flight ones. Parameters are immutable.
-
-**37. Arbitrary `delegatecall` in Implementation**
+**36. Arbitrary `delegatecall` in Implementation**
 
 - **D:** Implementation exposes `delegatecall` to user-supplied address without restriction. Pattern: `target.delegatecall(data)` where `target` is caller-controlled. Ref: Furucombo (2021).
 - **FP:** Target is hardcoded immutable address. Whitelist of approved targets enforced. `call` used instead.
 
-**38. Commit-Reveal Scheme Not Bound to msg.sender**
+**37. Commit-Reveal Scheme Not Bound to msg.sender**
 
 - **D:** Commitment hash does not include `msg.sender`: `commit = keccak256(abi.encodePacked(value, salt))`. Attacker copies a victim's commitment from the chain/mempool and submits their own reveal for the same hash from a different address. Affects auctions, governance votes, randomness.
 - **FP:** Commitment includes sender: `keccak256(abi.encodePacked(msg.sender, value, salt))`. Reveal validates `msg.sender` matches stored committer.
 
-**39. Delegate Privilege Escalation**
+**38. Delegate Privilege Escalation**
 
 - **D:** `setDelegate()` appoints an address that can manage OApp configurations including DVNs, Executors, message libraries, and can skip/clear payloads. If delegate is set to an insecure address (EOA, unrelated contract) or differs from owner without governance controls, the delegate can silently reconfigure the OApp's entire security stack.
 - **FP:** Delegate == owner. Delegate is a governance timelock or multisig. `setDelegate` protected by the same access controls as `setPeer`.
 
-**40. Cross-Chain Supply Accounting Invariant Violation**
+**39. Cross-Chain Supply Accounting Invariant Violation**
 
 - **D:** The fundamental invariant `total_locked_source >= total_minted_destination` is violated. Can occur through: decimal conversion errors between chains, `_credit` callable without corresponding `_debit`, race conditions in multi-chain deployments, or any bug that allows minting without locking. Minted tokens become partially or fully unbacked.
 - **FP:** Invariant verified via monitoring/alerting. `_credit` only callable from verified `lzReceive` path. Decimal conversion tested across all supported chains. Rate limits cap maximum exposure per time window.
 
 ---
 
-**41. ERC1155 onERC1155Received Return Value Not Validated**
+**40. ERC1155 onERC1155Received Return Value Not Validated**
 
 - **D:** Custom ERC1155 calls `onERC1155Received` but doesn't check returned `bytes4` equals `0xf23a6e61`. Non-compliant recipient silently accepts tokens it can't handle.
 - **FP:** OZ ERC1155 base validates selector. Custom impl explicitly checks return value.
 
-**42. Small Positions Unliquidatable Due to Insufficient Incentive (Bad Debt)**
+---
+
+**41. Small Positions Unliquidatable Due to Insufficient Incentive (Bad Debt)**
 
 - **D:** Positions below a certain USD value cost more gas to liquidate than the liquidation reward. During market downturns, these "dust positions" accumulate bad debt that no liquidator will process, eroding protocol solvency.
 - **FP:** Minimum position size enforced at borrow time. Protocol-operated liquidation bot covers dust positions. Socialized bad debt mechanism (insurance fund, haircuts).
 
-**43. Ordered Message Channel Blocking (Nonce DoS)**
+**42. Ordered Message Channel Blocking (Nonce DoS)**
 
 - **D:** OApp uses ordered nonce execution. If one message permanently reverts on destination (e.g., recipient contract reverts, invalid state), ALL subsequent messages from that source are blocked. Attacker intentionally sends a poison message to freeze the entire channel.
 - **FP:** Unordered nonce mode used (LayerZero V2 default). `_lzReceive` wrapped in try/catch with fallback logic. `NonblockingLzApp` pattern (V1). Admin can `skipPayload` / `clearPayload` to unblock. Ref: Code4rena Maia DAO finding #883.

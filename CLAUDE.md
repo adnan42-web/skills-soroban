@@ -10,7 +10,7 @@ A library of Claude AI skills. Each skill is a focused, self-contained capabilit
 
 ```
 skills/
-├── audit/           # Security review of Solidity changes while you develop
+├── solidity-auditor/ # Security review of Solidity changes while you develop
 CLAUDE.md            # This file (read by Claude Code)
 ```
 
@@ -19,4 +19,3 @@ CLAUDE.md            # This file (read by Claude Code)
 - One skill, one purpose.
 - No fabricated examples - outputs must reflect real model responses.
 - No secrets, API keys, or personal data.
-- Only list models in `model_compatibility` that have been tested.
