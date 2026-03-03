@@ -10,6 +10,7 @@ Built for **Solidity devs** who want a security check before every commit, **sec
 
 ## Demo
 
+_Portrayed below: finding multiple high-confidence vulnerabilities in a codebase_
 ![Running solidity-auditor in terminal](../static/skill_pag.gif)
 
 ## Usage
