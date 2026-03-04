@@ -9,16 +9,13 @@
 
 ## Install & Run
 
-Works with Claude Code in **VS Code**, **Cursor**, and the terminal. Clone this repo, then copy any skill folder into Claude Code's commands directory:
+Works with the **Claude Code CLI**, the **VS Code Claude extension**, and **Cursor**. Run the following in your terminal:
 
 ```bash
-git clone https://github.com/pashov/skills.git
-cp -r skills/solidity-auditor ~/.claude/commands/solidity-auditor
+git clone https://github.com/pashov/skills.git && cp -r skills/solidity-auditor ~/.claude/commands/solidity-auditor
 ```
 
 The skill is then invocable as `/solidity-auditor`.
-
-> **Tip:** Open a second terminal on the side, run the skill there, and keep coding in your main terminal.
 
 ---
 

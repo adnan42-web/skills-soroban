@@ -1,6 +1,6 @@
 # Attack Vectors Reference (4/4)
 
-168 total attack vectors
+170 total attack vectors
 
 ---
 
@@ -229,3 +229,13 @@
 
 - **D:** V2 inserts new state variable in middle of contract instead of appending. Subsequent variables shift slots, corrupting state. Also: changing variable type between versions shifts slot boundaries.
 - **FP:** New variables only appended. OZ storage layout validation in CI. Variable types unchanged between versions.
+
+**169. Hardcoded Calldataload Offset Bypass via Non-Canonical ABI Encoding**
+
+- **D:** Assembly reads a field at hardcoded calldata offset (`calldataload(164)`) assuming standard ABI layout. Attacker crafts non-canonical encoding — manipulated dynamic-type offset pointers or padding — so a different value sits at the expected position.
+- **FP:** Field decoded via `abi.decode()` (compiler bounds-checked). No hardcoded `calldataload` offsets — parameters extracted through Solidity's typed calldata accessors. `calldatasize() >= expected` validated before reading.
+
+**170. Calldata Input Malleability**
+
+- **D:** Contract hashes raw calldata for uniqueness (`processedHashes[keccak256(msg.data)]`). Dynamic-type ABI encoding uses offset pointers — multiple distinct calldata layouts decode to identical values. Attacker bypasses dedup with semantically equivalent but bytewise-different calldata.
+- **FP:** Uniqueness check hashes decoded parameters: `keccak256(abi.encode(decodedParams))`. Nonce-based replay protection. Only fixed-size types in signature (no encoding ambiguity).
