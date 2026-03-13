@@ -11,28 +11,30 @@
 
 Works with the **Claude Code CLI**, the **VS Code Claude extension**, and **Cursor**.
 
-**Claude Code CLI:**
+**Option 1 (Recommended) — AI CLI (Claude Code / Codex / Cursor chat etc.):**
 
-```bash
-git clone https://github.com/pashov/skills.git && mkdir -p ~/.claude/commands && cp -r skills/solidity-auditor ~/.claude/commands/solidity-auditor
+Install the skill by pasting this prompt:
+
+```
+Install skill https://github.com/pashov/skills/
 ```
 
-**Cursor:**
+Run the skill by pasting either of these prompts (when your agent is in your project's directory):
 
-```bash
-git clone https://github.com/pashov/skills.git && mkdir -p ~/.cursor/skills && cp -r skills/solidity-auditor ~/.cursor/skills/solidity-auditor
+```
+run solidity auditor on the codebase
 ```
 
-The skill is then invocable as `/solidity-auditor`. See the [skill README](solidity-auditor/README.md) for usage.
+```
+run solidity auditor on the *specified files*
+```
 
-**Update to latest:** `cd` into the cloned `skills` repo and run:
+**Update to latest:**
 
-```bash
-git pull
-# Claude Code CLI:
-cp -r solidity-auditor ~/.claude/commands/solidity-auditor
-# Cursor:
-cp -r solidity-auditor ~/.cursor/skills/solidity-auditor
+AI CLI prompt (Recommended):
+
+```
+update the solidity-auditor skill to latest version from https://github.com/pashov/skills/
 ```
 
 ---
