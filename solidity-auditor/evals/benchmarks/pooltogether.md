@@ -6,7 +6,7 @@ contracts_dir: timelock
 
 # Ground Truth — Soroban Timelock Case
 
-Source: Internal Soroban benchmark scenario.
+Source: Internal Soroban benchmark scenario (synthetic findings mapped to this repo layout for repeatable evals).
 
 ## Findings
 

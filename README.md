@@ -33,7 +33,7 @@ update skills to latest version
 
 | Skill                                 | Description                                                                     |
 | ------------------------------------- | ------------------------------------------------------------------------------- |
-| [soroban-auditor](solidity-auditor/) | Fast (typically <5 min) security feedback on Soroban Rust smart contract changes while you develop |
+| [solidity-auditor (Soroban)](solidity-auditor/) | Fast (typically <5 min) security feedback on Soroban Rust smart contract changes while you develop |
 | [x-ray](x-ray/)                       | Pre-audit scan with threat model, invariants, entry points, and git analysis    |
 
 ---

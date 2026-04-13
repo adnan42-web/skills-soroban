@@ -6,7 +6,7 @@ contracts_dir: token
 
 # Ground Truth — Soroban Token Case
 
-Source: Internal Soroban benchmark scenario.
+Source: Internal Soroban benchmark scenario (synthetic findings mapped to this repo layout for repeatable evals).
 
 ## Findings
 

@@ -6,7 +6,7 @@ contracts_dir: liquidity_pool
 
 # Ground Truth — Soroban Liquidity Pool Case
 
-Source: Internal Soroban benchmark scenario.
+Source: Internal Soroban benchmark scenario (synthetic findings mapped to this repo layout for repeatable evals).
 
 ## Findings
 

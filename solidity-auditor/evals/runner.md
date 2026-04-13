@@ -42,7 +42,11 @@ for name in pooltogether dodo megapot; do
   BENCH="$BENCHMARKS_DIR/$name.md"
   [ -f "$BENCH" ] || continue
 
-  CONTRACTS_DIR=$(grep '^contracts_dir:' "$BENCH" | sed 's/contracts_dir: *//' || true)
+  CONTRACTS_DIR=$(sed -n 's/^contracts_dir:[[:space:]]*//p' "$BENCH" | head -1)
+  if grep -q '^contracts_dir:' "$BENCH" && [ -z "$CONTRACTS_DIR" ]; then
+    echo "Invalid contracts_dir in $BENCH"
+    continue
+  fi
   WORK_DIR="/tmp/eval-$name${CONTRACTS_DIR:+/$CONTRACTS_DIR}"
   RUN_DIR="$RESULTS_DIR/$name/$TIMESTAMP-$COMMIT"
 
