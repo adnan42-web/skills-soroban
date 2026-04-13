@@ -7,17 +7,17 @@ Your bundle has two sections:
 1. **Core source** (inline) — read in parallel chunks (offset + limit), compute offsets from the line count in your prompt.
 2. **Peripheral file manifest** — file paths under `# Peripheral Files (read on demand)`. Read only those relevant to your specialty.
 
-When matching function names, check both `functionName` and `_functionName` (Solidity convention).
+When matching function names, check both `function_name` and private helper variants (`_function_name`).
 
 ## Cross-contract patterns
 
-When you find a bug in one contract, **weaponize that pattern across every other contract in the bundle.** Search by function name AND by code pattern. Finding native/ERC20 confusion in `ContractA.onRevert` means you check every other contract's `onRevert` — missing a repeat instance is an audit failure.
+When you find a bug in one contract, **weaponize that pattern across every other contract in the bundle.** Search by function name and by code pattern.
 
-After scanning: escalate every finding to its worst exploitable variant (DoS may hide fund theft). Then revisit every function where you found something and attack the other branches.
+After scanning: escalate every finding to its worst exploitable variant (DoS may hide fund theft). Then revisit every function where you found something and attack other branches.
 
 ## Do not report
 
-Admin-only functions doing admin things. Standard DeFi tradeoffs (MEV, rounding dust, first-depositor with MINIMUM_LIQUIDITY). Self-harm-only bugs. "Admin can rug" without a concrete mechanism.
+Admin-only functions doing admin things. Standard DeFi tradeoffs without concrete exploit path. Self-harm-only bugs.
 
 ## Output
 
@@ -25,7 +25,7 @@ Return structured blocks only — no preamble, no narration. Exception: vector s
 
 FINDINGs have concrete, unguarded, exploitable attack paths. LEADs have real code smells with partial paths — default to LEAD over dropping.
 
-**Every FINDING must have a `proof:` field** — concrete values, traces, or state sequences from the actual code. No proof = LEAD, no exceptions.
+**Every FINDING must have a `proof:` field** — concrete values, traces, or state sequences from actual code. No proof = LEAD.
 
 **One vulnerability per item.** Same root cause = one item. Different fixes needed = separate items.
 

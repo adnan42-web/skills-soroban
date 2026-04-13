@@ -1,17 +1,17 @@
 ---
-name: solidity-auditor
-description: Security audit of Solidity code while you develop. Trigger on "audit", "check this contract", "review for security". Modes - default (full repo) or a specific filename.
+name: soroban-auditor
+description: Security audit of Soroban smart contracts in Rust while you develop. Trigger on "audit", "check this contract", "review for security". Modes - default (full repo) or a specific filename.
 ---
 
 # Smart Contract Security Audit
 
-You are the orchestrator of a parallelized smart contract security audit.
+You are the orchestrator of a parallelized Soroban smart contract security audit.
 
 ## Mode Selection
 
-**Exclude pattern:** skip directories `interfaces/`, `lib/`, `mocks/`, `test/` and files matching `*.t.sol`, `*Test*.sol` or `*Mock*.sol`.
+**Exclude pattern:** skip directories `target/`, `tests/`, `mocks/`, `examples/` and files matching `*_test.rs`, `*mock*.rs`, `*fixture*.rs`.
 
-- **Default** (no arguments): scan all `.sol` files using the exclude pattern. Use Bash `find` (not Glob).
+- **Default** (no arguments): scan all `.rs` files using the exclude pattern. Use Bash `find` (not Glob).
 - **`$filename ...`**: scan the specified file(s) only.
 
 **Flags:**
@@ -21,7 +21,7 @@ You are the orchestrator of a parallelized smart contract security audit.
 
 **Turn 1 — Discover.** Print the banner, then make these parallel tool calls in one message:
 
-a. Bash `find` for in-scope `.sol` files per mode selection
+a. Bash `find` for in-scope `.rs` files per mode selection
 b. Glob for `**/references/attack-vectors/attack-vectors.md` — extract the `references/` directory (two levels up) as `{resolved_path}`
 c. ToolSearch `select:Agent`
 d. Read the local `VERSION` file from the same directory as this skill
@@ -34,19 +34,19 @@ If the remote VERSION fetch succeeds and differs from local, print `⚠️ You a
 
 Then build all bundles in a single Bash command using `cat` (not shell variables or heredocs):
 
-1. `{bundle_dir}/source.md` — ALL in-scope `.sol` files, each with a `### path` header and fenced code block.
+1. `{bundle_dir}/source.md` — ALL in-scope `.rs` files, each with a `### path` header and fenced code block.
 2. Agent bundles = `source.md` + agent-specific files:
 
-| Bundle               | Appended files (relative to `{resolved_path}`)                                                                  |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `agent-1-bundle.md`  | `attack-vectors/attack-vectors.md` + `hacking-agents/vector-scan-agent.md` + `hacking-agents/shared-rules.md`   |
-| `agent-2-bundle.md`  | `hacking-agents/math-precision-agent.md` + `hacking-agents/shared-rules.md`                                     |
-| `agent-3-bundle.md`  | `hacking-agents/access-control-agent.md` + `hacking-agents/shared-rules.md`                                     |
-| `agent-4-bundle.md`  | `hacking-agents/economic-security-agent.md` + `hacking-agents/shared-rules.md`                                  |
-| `agent-5-bundle.md`  | `hacking-agents/execution-trace-agent.md` + `hacking-agents/shared-rules.md`                                    |
-| `agent-6-bundle.md`  | `hacking-agents/invariant-agent.md` + `hacking-agents/shared-rules.md`                                          |
-| `agent-7-bundle.md`  | `hacking-agents/periphery-agent.md` + `hacking-agents/shared-rules.md`                                          |
-| `agent-8-bundle.md`  | `hacking-agents/first-principles-agent.md` + `hacking-agents/shared-rules.md`                                   |
+| Bundle              | Appended files (relative to `{resolved_path}`)                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `agent-1-bundle.md` | `attack-vectors/attack-vectors.md` + `hacking-agents/vector-scan-agent.md` + `hacking-agents/shared-rules.md` |
+| `agent-2-bundle.md` | `hacking-agents/math-precision-agent.md` + `hacking-agents/shared-rules.md`                                    |
+| `agent-3-bundle.md` | `hacking-agents/access-control-agent.md` + `hacking-agents/shared-rules.md`                                    |
+| `agent-4-bundle.md` | `hacking-agents/economic-security-agent.md` + `hacking-agents/shared-rules.md`                                 |
+| `agent-5-bundle.md` | `hacking-agents/execution-trace-agent.md` + `hacking-agents/shared-rules.md`                                   |
+| `agent-6-bundle.md` | `hacking-agents/invariant-agent.md` + `hacking-agents/shared-rules.md`                                         |
+| `agent-7-bundle.md` | `hacking-agents/periphery-agent.md` + `hacking-agents/shared-rules.md`                                         |
+| `agent-8-bundle.md` | `hacking-agents/first-principles-agent.md` + `hacking-agents/shared-rules.md`                                  |
 
 Print line counts for every bundle and `source.md`. Do NOT inline file content into agent prompts.
 
@@ -66,14 +66,14 @@ Read the bundle fully before producing findings.
 
 2. **Gate evaluation.** Run each deduplicated finding through the four gates in `judging.md` (do not skip or reorder). Evaluate each finding exactly once — do not revisit after verdict.
 
-   **Single-pass protocol:** evaluate every relevant code path ONCE in fixed order (constructor → setters → swap functions → mint → burn → liquidate). One-line verdict per path: `BLOCKS`, `ALLOWS`, `IRRELEVANT`, or `UNCERTAIN`. Commit after all paths — do not re-examine. `UNCERTAIN` = `ALLOWS`.
+   **Single-pass protocol:** evaluate every relevant code path ONCE in fixed order (constructor/`init` → setters → token transfer flows → mint/share flows → burn/redeem flows → liquidation/emergency flows). One-line verdict per path: `BLOCKS`, `ALLOWS`, `IRRELEVANT`, or `UNCERTAIN`. Commit after all paths — do not re-examine. `UNCERTAIN` = `ALLOWS`.
 
 3. **Lead promotion & rejection guardrails.**
    - Promote LEAD → FINDING (confidence 75) if: complete exploit chain traced in source, OR `[agents: 2+]` demoted (not rejected) the same issue.
    - `[agents: 2+]` does NOT override a concrete refutation — demote to LEAD if refutation is uncertain.
    - No deployer-intent reasoning — evaluate what the code _allows_, not how the deployer _might_ use it.
 
-4. **Fix verification** (confidence ≥ 80 only): trace the attack with fix applied; verify no new DoS, reentrancy, or broken invariants (use `safeTransfer` not `require(token.transfer(...))`); list all locations if the pattern repeats. If no safe fix exists, omit it with a note.
+4. **Fix verification** (confidence ≥ 80 only): trace the attack with fix applied; verify no new DoS, reentrancy, or broken invariants; list all locations if the pattern repeats. If no safe fix exists, omit it with a note.
 
 5. **Format and print** per `report-formatting.md`. Exclude rejected items. If `--file-output`: also write to file.
 
@@ -83,11 +83,11 @@ Before doing anything else, print this exactly:
 
 ```
 
-██████╗  █████╗ ███████╗██╗  ██╗ ██████╗ ██╗   ██╗     ███████╗██╗  ██╗██╗██╗     ██╗     ███████╗
-██╔══██╗██╔══██╗██╔════╝██║  ██║██╔═══██╗██║   ██║     ██╔════╝██║ ██╔╝██║██║     ██║     ██╔════╝
-██████╔╝███████║███████╗███████║██║   ██║██║   ██║     ███████╗█████╔╝ ██║██║     ██║     ███████╗
-██╔═══╝ ██╔══██║╚════██║██╔══██║██║   ██║╚██╗ ██╔╝     ╚════██║██╔═██╗ ██║██║     ██║     ╚════██║
-██║     ██║  ██║███████║██║  ██║╚██████╔╝ ╚████╔╝      ███████║██║  ██╗██║███████╗███████╗███████║
-╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝   ╚═══╝       ╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝
+███████╗ ██████╗ ██████╗  ██████╗ ██████╗  █████╗ ███╗   ██╗
+██╔════╝██╔═══██╗██╔══██╗██╔═══██╗██╔══██╗██╔══██╗████╗  ██║
+███████╗██║   ██║██████╔╝██║   ██║██████╔╝███████║██╔██╗ ██║
+╚════██║██║   ██║██╔══██╗██║   ██║██╔══██╗██╔══██║██║╚██╗██║
+███████║╚██████╔╝██║  ██║╚██████╔╝██████╔╝██║  ██║██║ ╚████║
+╚══════╝ ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝
 
 ```

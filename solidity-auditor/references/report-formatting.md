@@ -13,11 +13,11 @@ Save the report to `assets/findings/{project-name}-pashov-ai-audit-report-{times
 
 ## Scope
 
-|                                  |                                                        |
-| -------------------------------- | ------------------------------------------------------ |
-| **Mode**                         | ALL / default / filename                               |
-| **Files reviewed**               | `File1.sol` · `File2.sol`<br>`File3.sol` · `File4.sol` | <!-- list every file, 3 per line -->
-| **Confidence threshold (1-100)** | N                                                      |
+|                                  |                                                      |
+| -------------------------------- | ---------------------------------------------------- |
+| **Mode**                         | ALL / default / filename                             |
+| **Files reviewed**               | `lib.rs` · `contract.rs`<br>`pool.rs` · `admin.rs`   |
+| **Confidence threshold (1-100)** | N                                                    |
 
 ---
 
@@ -25,7 +25,7 @@ Save the report to `assets/findings/{project-name}-pashov-ai-audit-report-{times
 
 [95] **1. <Title>**
 
-`ContractName.functionName` · Confidence: 95
+`ContractName.function_name` · Confidence: 95
 
 **Description**
 <The vulnerable code pattern and why it is exploitable, in 1 short sentence>
@@ -40,7 +40,7 @@ Save the report to `assets/findings/{project-name}-pashov-ai-audit-report-{times
 
 [82] **2. <Title>**
 
-`ContractName.functionName` · Confidence: 82
+`ContractName.function_name` · Confidence: 82
 
 **Description**
 <The vulnerable code pattern and why it is exploitable, in 1 short sentence>
@@ -59,7 +59,7 @@ Save the report to `assets/findings/{project-name}-pashov-ai-audit-report-{times
 
 [75] **3. <Title>**
 
-`ContractName.functionName` · Confidence: 75
+`ContractName.function_name` · Confidence: 75
 
 **Description**
 <The vulnerable code pattern and why it is exploitable, in 1 short sentence>
@@ -82,10 +82,10 @@ Findings List
 
 ## Leads
 
-_Vulnerability trails with concrete code smells where the full exploit path could not be completed in one analysis pass. These are not false positives — they are high-signal leads for manual review. Not scored._
+_Vulnerability trails with concrete code smells where the full exploit path could not be completed in one analysis pass. These are high-signal leads for manual review. Not scored._
 
-- **<Title>** — `Contract.function` — Code smells: <missing guard, unsafe arithmetic, etc.> — <1-2 sentence description of the trail and what remains unverified>
-- **<Title>** — `Contract.function` — Code smells: <...> — <1-2 sentence description>
+- **<Title>** — `Contract.function_name` — Code smells: <missing auth, unsafe arithmetic, stale storage, etc.> — <1-2 sentence description>
+- **<Title>** — `Contract.function_name` — Code smells: <...> — <1-2 sentence description>
 
 ---
 
@@ -94,4 +94,3 @@ _Vulnerability trails with concrete code smells where the full exploit path coul
 ````
 
 **Rules:** Follow the template above exactly. Sort findings by confidence (highest first). Findings below the threshold get a description but no **Fix** block. Draft findings directly in report format — do not re-generate.
-

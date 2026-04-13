@@ -2,7 +2,7 @@
 
 **⚠️ Work in Progress — this feature is not ready yet.**
 
-Drop any context that helps the auditor understand what the protocol is supposed to do:
+Drop any context that helps the Soroban auditor understand what the protocol is supposed to do:
 
 - Design docs and specs
 - Intended invariants

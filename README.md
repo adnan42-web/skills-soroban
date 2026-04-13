@@ -1,6 +1,6 @@
 # Pashov Audit Group Skills
 
-> AI-powered Solidity security skills — built by [Pashov Audit Group](https://www.pashov.com/).
+> AI-powered Soroban security skills — built by [Pashov Audit Group](https://www.pashov.com/).
 
 **Supported AI Platforms:**
 [![Claude Code](https://img.shields.io/badge/Claude_Code-F5E6D0?style=for-the-badge&logo=anthropic&logoColor=1a1a1a)](https://claude.ai/download)
@@ -15,12 +15,12 @@
 
 ```
 Install https://github.com/pashov/skills/ and run an x-ray on the codebase
-Install https://github.com/pashov/skills/ and run solidity auditor with all different agents possible on the codebase
+Install https://github.com/pashov/skills/ and run soroban auditor with all different agents possible on the codebase
 ```
 
 ```
 run an x-ray on the codebase
-run the solidity auditor with all the different agents possible on *specified files*
+run the soroban auditor with all the different agents possible on *specified files*
 ```
 
 ```
@@ -33,7 +33,7 @@ update skills to latest version
 
 | Skill                                 | Description                                                                     |
 | ------------------------------------- | ------------------------------------------------------------------------------- |
-| [solidity-auditor](solidity-auditor/) | Fast (typically <5 min) security feedback on Solidity changes while you develop |
+| [soroban-auditor](solidity-auditor/) | Fast (typically <5 min) security feedback on Soroban Rust smart contract changes while you develop |
 | [x-ray](x-ray/)                       | Pre-audit scan with threat model, invariants, entry points, and git analysis    |
 
 ---

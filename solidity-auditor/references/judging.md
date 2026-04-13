@@ -4,7 +4,7 @@ Every finding passes four sequential gates. Fail any gate → **rejected** or **
 
 ## Gate 1 — Refutation
 
-Construct the strongest argument that the finding is wrong. Find the guard, check, or constraint that kills the attack — quote the exact line and trace how it blocks the claimed step.
+Construct the strongest argument that the finding is wrong. Find the auth check, invariant, or environment constraint that kills the attack — quote the exact line and trace how it blocks the claimed step.
 
 - Concrete refutation (specific guard blocks exact claimed step) → **REJECTED** (or **DEMOTE** if code smell remains)
 - Speculative refutation ("probably wouldn't happen") → **clears**, continue
@@ -39,13 +39,11 @@ Start at **100**, deduct: partial attack path **-20**, bounded non-compounding i
 
 ## Safe patterns (do not flag)
 
-- `unchecked` in 0.8+ (but verify the reasoning is correct)
-- Explicit narrowing casts in 0.8+ (reverts on overflow)
-- MINIMUM_LIQUIDITY burn on first deposit
-- SafeERC20 (`safeTransfer`/`safeTransferFrom`)
-- `nonReentrant` (only flag cross-contract attacks)
-- Two-step admin transfer
+- `checked_*` or explicit overflow handling in Rust when used correctly
+- `require_auth` correctly bound to the value owner
 - Consistent protocol-favoring rounding unless compounding or zero-rounding
+- Intentional admin-only operations with clear role gates
+- Event-only differences without state risk
 
 ## Lead promotion
 
@@ -61,4 +59,4 @@ High-signal trails for manual investigation. No confidence score, no fix — tit
 
 ## Do Not Report
 
-Linter/compiler issues, gas micro-opts, naming, NatSpec. Admin privileges by design. Missing events. Centralization without exploit path. Implausible preconditions (but fee-on-transfer, rebasing, blacklisting ARE plausible for contracts accepting arbitrary tokens).
+Linter/compiler issues, style-only suggestions, naming, docs-only comments. Admin privileges by design. Missing events. Centralization without exploit path.
