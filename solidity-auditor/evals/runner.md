@@ -1,6 +1,6 @@
 # Eval Runner
 
-Run the solidity-auditor skill against benchmark repos and compare results to ground truth.
+Run the soroban-auditor skill against benchmark repos and compare results to ground truth.
 
 ## Usage
 
@@ -32,7 +32,7 @@ For each benchmark, clone the repo (shallow, skip if `/tmp/eval-{name}` exists) 
 
 Run benchmarks **sequentially** in this fixed order: **pooltogether → dodo → megapot**. Each run gets a fresh `claude` process so context does not carry over between benchmarks.
 
-The `--plugin-dir /tmp/audit-plugin` flag is **required** — it makes the skill discoverable via the symlink created in Setup. Without it, `claude` will report "Unknown skill: solidity-auditor".
+The `--plugin-dir /tmp/audit-plugin` flag is **required** — it makes the skill discoverable via the symlink created in Setup.
 
 ```bash
 BENCHMARKS_DIR="$SKILL_DIR/evals/benchmarks"
@@ -42,8 +42,11 @@ for name in pooltogether dodo megapot; do
   BENCH="$BENCHMARKS_DIR/$name.md"
   [ -f "$BENCH" ] || continue
 
-  # Read contracts_dir from frontmatter (optional, defaults to repo root)
-  CONTRACTS_DIR=$(grep '^contracts_dir:' "$BENCH" | sed 's/contracts_dir: *//' || true)
+  CONTRACTS_DIR=$(sed -n 's/^contracts_dir:[[:space:]]*//p' "$BENCH" | head -1)
+  if grep -q '^contracts_dir:' "$BENCH" && [ -z "$CONTRACTS_DIR" ]; then
+    echo "Invalid contracts_dir in $BENCH"
+    continue
+  fi
   WORK_DIR="/tmp/eval-$name${CONTRACTS_DIR:+/$CONTRACTS_DIR}"
   RUN_DIR="$RESULTS_DIR/$name/$TIMESTAMP-$COMMIT"
 
@@ -51,7 +54,7 @@ for name in pooltogether dodo megapot; do
   mkdir -p "$RUN_DIR" && \
   cd "$WORK_DIR" && mkdir -p assets/audit-logs && \
   claude --print --plugin-dir /tmp/audit-plugin --dangerously-skip-permissions \
-    "run solidity auditor skill with --log-output" 2>&1 | tee "$RUN_DIR/full-output.txt" && \
+    "run soroban auditor skill with --log-output" 2>&1 | tee "$RUN_DIR/full-output.txt" && \
   cp -r "$(ls -dt assets/audit-logs/*/ | head -1)"* "$RUN_DIR/" 2>/dev/null; \
   cp "$BENCH" "$RUN_DIR/ground-truth.md"
   echo "=== Finished $name ==="
